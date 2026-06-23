@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "Cloud Markdown notes API, Web UI, and development workspace.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wzxklm/cloud-markdown-notes.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wzxklm/cloud-markdown-notes/issues"
+  },
+  "homepage": "https://github.com/wzxklm/cloud-markdown-notes#readme",
   "type": "module",
   "scripts": {
     "dev": "npm run migrate && concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",

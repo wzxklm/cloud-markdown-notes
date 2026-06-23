@@ -2,9 +2,19 @@
   "name": "cloud-markdown-notes",
   "version": "0.1.0",
   "description": "Command-line client for Cloud Markdown Notes.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wzxklm/cloud-markdown-notes.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/wzxklm/cloud-markdown-notes/issues"
+  },
+  "homepage": "https://github.com/wzxklm/cloud-markdown-notes#readme",
   "type": "module",
   "bin": {
-    "notes": "./dist/index.js"
+    "notes": "dist/index.js"
   },
   "files": [
     "dist/index.js"
