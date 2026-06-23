@@ -30,11 +30,7 @@ Docker 开发、测试和部署需要：
 
 ## 环境变量
 
-开发环境可从示例复制：
-
-```bash
-cp .env.example .env
-```
+开发环境使用仓库内的 `.env.dev`。
 
 常用变量：
 
@@ -94,7 +90,7 @@ PROD_HOST_DATA_ROOT=./runtime/prod
 启动 Docker 开发服务：
 
 ```bash
-docker compose --project-directory . -f docker/compose.yml up -d app db
+docker compose --env-file .env.dev --project-directory . -f docker/compose.yml up -d app db
 ```
 
 默认访问：
@@ -105,13 +101,13 @@ docker compose --project-directory . -f docker/compose.yml up -d app db
 查看日志：
 
 ```bash
-docker compose --project-directory . -f docker/compose.yml logs -f app
+docker compose --env-file .env.dev --project-directory . -f docker/compose.yml logs -f app
 ```
 
 停止服务：
 
 ```bash
-docker compose --project-directory . -f docker/compose.yml down
+docker compose --env-file .env.dev --project-directory . -f docker/compose.yml down
 ```
 
 开发 Compose 项目名固定为 `notes-dev`，避免和测试、生产容器互相覆盖。
@@ -174,7 +170,7 @@ runtime/fulltest-docker/compose.log
 手动清理测试环境：
 
 ```bash
-docker compose --project-directory . -f docker/compose.yml -f docker/compose.test.yml down
+docker compose --env-file .env.dev --project-directory . -f docker/compose.yml -f docker/compose.test.yml down
 rm -rf runtime/fulltest-docker
 ```
 
@@ -189,7 +185,7 @@ cp .env.prod.example .env.prod
 编辑 `.env.prod` 后启动：
 
 ```bash
-docker compose --project-directory . -f docker/compose.yml -f docker/compose.prod.yml up -d --build app db
+docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml up -d --build app db
 ```
 
 生产容器启动时会先运行迁移，再同时启动：
@@ -202,13 +198,13 @@ docker compose --project-directory . -f docker/compose.yml -f docker/compose.pro
 查看日志：
 
 ```bash
-docker compose --project-directory . -f docker/compose.yml -f docker/compose.prod.yml logs -f app
+docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml logs -f app
 ```
 
 停止：
 
 ```bash
-docker compose --project-directory . -f docker/compose.yml -f docker/compose.prod.yml down
+docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml down
 ```
 
 生产 Compose 项目名固定为 `notes-prod`，不会被开发或测试环境的 `down` 清理。
@@ -341,7 +337,7 @@ NOTES_API_URL=http://localhost:8080 npm run notes -- health
 已启动开发容器后运行真实 CLI：
 
 ```bash
-docker compose --project-directory . -f docker/compose.yml exec app notes health
+docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app notes health
 ```
 
 CLI 已发布到 npm，可直接安装：

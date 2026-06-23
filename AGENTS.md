@@ -70,8 +70,8 @@ Validation:
 ├── vite.config.ts                    # Vite/React 配置和开发 API 代理
 ├── playwright.config.ts              # Playwright Web 端到端测试配置
 ├── eslint.config.js                  # ESLint 配置
-├── .env                              # 当前本地环境变量
-├── .env.example                      # 开发环境变量示例
+├── .env.dev                          # 开发环境变量
+├── .env.prod                         # 生产环境变量，本地私有文件
 ├── .env.prod.example                 # 生产环境变量示例
 ├── .gitignore                        # Git 忽略规则
 ├── .dockerignore                     # Docker 构建忽略规则

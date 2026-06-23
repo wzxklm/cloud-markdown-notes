@@ -5,7 +5,7 @@ status=0
 report_root="runtime/fulltest-docker"
 
 compose() {
-  docker compose --project-directory . -f docker/compose.yml -f docker/compose.test.yml "$@"
+  docker compose --env-file .env.dev --project-directory . -f docker/compose.yml -f docker/compose.test.yml "$@"
 }
 
 capture_logs() {

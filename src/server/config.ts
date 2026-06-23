@@ -1,5 +1,7 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import path from "node:path";
+
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH ?? ".env.dev" });
 
 export type AppConfig = {
   appEnv: string;

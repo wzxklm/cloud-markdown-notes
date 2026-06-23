@@ -6,9 +6,6 @@ services:
       context: .
       dockerfile: docker/Dockerfile
       target: production
-    env_file: !override
-      - path: .env.prod
-        required: false
     environment:
       APP_ENV: production
       API_PORT: 3000
@@ -30,9 +27,6 @@ services:
       - ${PROD_HOST_DATA_ROOT:-./runtime/prod}/workspaces:/data/workspaces
 
   db:
-    env_file: !override
-      - path: .env.prod
-        required: false
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-notes}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace-me}

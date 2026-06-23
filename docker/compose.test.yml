@@ -2,7 +2,6 @@ name: notes-test
 
 services:
   app:
-    env_file: !override []
     environment:
       APP_ENV: test
       API_PORT: 3000
@@ -30,7 +29,6 @@ services:
       - ./runtime/fulltest-docker/test-results:/app/runtime/fulltest-docker/test-results
 
   db:
-    env_file: !override []
     environment:
       POSTGRES_USER: notes
       POSTGRES_PASSWORD: notes
