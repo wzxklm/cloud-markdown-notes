@@ -1,0 +1,40 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: production
+    env_file: !override
+      - path: .env.prod
+        required: false
+    environment:
+      APP_ENV: production
+      API_PORT: 3000
+      WEB_PORT: 5173
+      DATABASE_URL: postgres://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-replace-me}@db:5432/${POSTGRES_DB:-notes}
+      NOTES_API_URL: http://app:3000
+      WORKSPACE_ROOT: /data/workspaces
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
+      SESSION_SECRET: ${SESSION_SECRET:-replace-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-replace-me}
+    command:
+      ["sh", "-c", "node dist-node/scripts/migrate.js && node dist-node/scripts/start-prod.js"]
+    restart: unless-stopped
+    ports: !override
+      - "${PROD_HOST_API_PORT:-8080}:3000"
+      - "${PROD_HOST_WEB_PORT:-5173}:5173"
+    volumes: !override
+      - ${PROD_HOST_DATA_ROOT:-./runtime/prod}/workspaces:/data/workspaces
+
+  db:
+    env_file: !override
+      - path: .env.prod
+        required: false
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-notes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace-me}
+      POSTGRES_DB: ${POSTGRES_DB:-notes}
+    restart: unless-stopped
+    volumes: !override
+      - ${PROD_HOST_DATA_ROOT:-./runtime/prod}/postgres:/var/lib/postgresql/data

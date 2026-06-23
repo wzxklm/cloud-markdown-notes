@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-node/
+coverage/
+runtime/
+.git/
+.codex/
+package-lock.json
+
+AGENTS.md
+docs/PRD.md
+docs/实施计划.md
+docs/技术方案.md

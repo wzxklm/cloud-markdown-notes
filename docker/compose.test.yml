@@ -1,0 +1,37 @@
+services:
+  app:
+    env_file: !override []
+    environment:
+      APP_ENV: test
+      API_PORT: 3000
+      WEB_PORT: 5173
+      DATABASE_URL: postgres://notes:notes@db:5432/notes
+      NOTES_API_URL: http://127.0.0.1:3000
+      API_BASE_URL: http://127.0.0.1:3000/api
+      WEB_BASE_URL: http://127.0.0.1:5173
+      WORKSPACE_ROOT: /data/workspaces
+      PUBLIC_BASE_URL: http://127.0.0.1:5173
+      SESSION_SECRET: test-secret
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin-password
+      PLAYWRIGHT_BROWSERS_PATH: /root/.cache/ms-playwright
+      PLAYWRIGHT_HTML_REPORT_DIR: /app/runtime/fulltest-docker/playwright-report
+      PLAYWRIGHT_TEST_RESULTS_DIR: /app/runtime/fulltest-docker/test-results
+    command: ["npm", "start"]
+    ports: !override []
+    volumes: !override
+      - .:/app
+      - app_node_modules:/app/node_modules
+      - ./runtime/fulltest-docker/workspaces:/data/workspaces
+      - ./runtime/fulltest-docker/runner:/app/runtime/fulltest-docker/runner
+      - ./runtime/fulltest-docker/playwright-report:/app/runtime/fulltest-docker/playwright-report
+      - ./runtime/fulltest-docker/test-results:/app/runtime/fulltest-docker/test-results
+
+  db:
+    env_file: !override []
+    environment:
+      POSTGRES_USER: notes
+      POSTGRES_PASSWORD: notes
+      POSTGRES_DB: notes
+    volumes: !override
+      - ./runtime/fulltest-docker/postgres:/var/lib/postgresql/data

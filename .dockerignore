@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-node
+coverage
+runtime
+.git
+.codex
+.env
+.env.*
+!.env.example
+!.env.prod.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

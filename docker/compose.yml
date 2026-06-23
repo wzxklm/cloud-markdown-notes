@@ -1,0 +1,59 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: development
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      API_PORT: ${API_PORT:-3000}
+      WEB_PORT: ${WEB_PORT:-5173}
+      DATABASE_URL: postgres://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes}@db:5432/${POSTGRES_DB:-notes}
+      NOTES_API_URL: http://app:${API_PORT:-3000}
+      WORKSPACE_ROOT: /data/workspaces
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${HOST_API_PORT:-8080}:${API_PORT:-3000}"
+      - "${HOST_WEB_PORT:-5173}:${WEB_PORT:-5173}"
+    volumes:
+      - .:/app
+      - app_node_modules:/app/node_modules
+      - ${HOST_DATA_ROOT:-./runtime/dev}/workspaces:/data/workspaces
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:'' + (process.env.API_PORT || 3000) + ''/api/health'').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"'
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-notes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-notes}
+      POSTGRES_DB: ${POSTGRES_DB:-notes}
+    volumes:
+      - ${HOST_DATA_ROOT:-./runtime/dev}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notes} -d ${POSTGRES_DB:-notes}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  app_node_modules:
