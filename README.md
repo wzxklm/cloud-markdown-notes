@@ -114,6 +114,8 @@ docker compose --project-directory . -f docker/compose.yml logs -f app
 docker compose --project-directory . -f docker/compose.yml down
 ```
 
+开发 Compose 项目名固定为 `notes-dev`，避免和测试、生产容器互相覆盖。
+
 宿主机直接运行开发进程：
 
 ```bash
@@ -167,6 +169,8 @@ runtime/fulltest-docker/compose.log
 
 失败时会保留 Playwright 报告、测试结果和 Compose 日志，便于排查；该环境不污染 `runtime/dev` 和 `runtime/prod`。
 
+测试 Compose 项目名固定为 `notes-test`，不会复用开发或生产容器。
+
 手动清理测试环境：
 
 ```bash
@@ -206,6 +210,8 @@ docker compose --project-directory . -f docker/compose.yml -f docker/compose.pro
 ```bash
 docker compose --project-directory . -f docker/compose.yml -f docker/compose.prod.yml down
 ```
+
+生产 Compose 项目名固定为 `notes-prod`，不会被开发或测试环境的 `down` 清理。
 
 ## API 使用
 

@@ -1,3 +1,5 @@
+name: notes-prod
+
 services:
   app:
     build:

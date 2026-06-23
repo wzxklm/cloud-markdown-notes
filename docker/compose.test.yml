@@ -1,3 +1,5 @@
+name: notes-test
+
 services:
   app:
     env_file: !override []

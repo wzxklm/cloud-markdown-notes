@@ -1,3 +1,5 @@
+name: notes-dev
+
 services:
   app:
     build:
