@@ -338,7 +338,7 @@ NOTES_API_URL=http://localhost:8080 npm run notes -- health
 docker compose --project-directory . -f docker/compose.yml exec app notes health
 ```
 
-作为 npm CLI 分发后：
+CLI 已发布到 npm，可直接安装：
 
 ```bash
 npm install -g cloud-markdown-notes
@@ -423,9 +423,11 @@ notes share unpublish <share-id>
 notes status --json
 ```
 
-### CLI 发布
+### CLI 包维护
 
-CLI 对外发布包位于 `packages/cli`，包名是 `cloud-markdown-notes`。发布前先在仓库根目录跑完整测试，再检查包内容：
+CLI 对外发布包位于 `packages/cli`，npm 包名是 `cloud-markdown-notes`，当前可通过 `npm install -g cloud-markdown-notes` 直接安装。
+
+维护者发布新版本前，先在仓库根目录跑完整测试，再检查包内容：
 
 ```bash
 npm test
@@ -439,7 +441,7 @@ npm pack --dry-run
 
 CLI 包没有运行时 npm 依赖。用户安装 `cloud-markdown-notes` 时只会安装 CLI 客户端，不会安装 API、PostgreSQL、React 或 Web UI 相关依赖。
 
-确认 dry-run 包内容无误后发布：
+确认 dry-run 包内容无误后，在 `packages/cli` 目录发布：
 
 ```bash
 npm publish
