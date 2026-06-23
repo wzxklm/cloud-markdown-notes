@@ -63,6 +63,14 @@ test("creates, edits, versions, moves, restores, discards, and deletes notes", a
   await expect(page.getByText("Path moved")).toBeVisible();
   await expect(page.getByRole("button", { name: "empty-moved" })).toBeVisible();
 
+  await page.getByRole("button", { name: "empty-moved" }).click();
+  await expect(page.locator(".toolbar strong")).toHaveText("/docs/empty-moved");
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("No note selected")).toBeVisible();
+  await expect(page.getByRole("button", { name: "empty-moved" })).toHaveCount(0);
+  await page.getByRole("button", { name: "b.md" }).click();
+  await expect(page.locator(".toolbar strong")).toHaveText("/docs/b.md");
+
   await page.getByLabel("Markdown editor").fill("# Draft before discard\n");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.locator(".notice")).toHaveText("Saved");

@@ -25,6 +25,11 @@ type Note = {
   fileVersion: string;
 };
 
+type SelectedPath = {
+  path: string;
+  type: "folder" | "note";
+};
+
 type GitChange = {
   path: string;
   oldPath?: string;
@@ -326,6 +331,7 @@ function WorkspacePage({
   onLogout: () => void;
 }) {
   const [tree, setTree] = useState<TreeNode | null>(null);
+  const [selectedPath, setSelectedPath] = useState<SelectedPath | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [editorContent, setEditorContent] = useState("");
   const [status, setStatus] = useState<GitChange[]>([]);
@@ -359,6 +365,7 @@ function WorkspacePage({
   const [pendingUsers, setPendingUsers] = useState<PublicUser[]>([]);
 
   const hasDirtyEditor = selectedNote !== null && editorContent !== selectedNote.content;
+  const currentPathLabel = selectedPath?.path ?? selectedNote?.path ?? "No note selected";
 
   async function refreshWorkspace() {
     const [{ tree: nextTree }, { changes }, { commits }, sharesData] = await Promise.all([
@@ -397,9 +404,18 @@ function WorkspacePage({
       token,
       query: { path: pathname }
     });
+    setSelectedPath({ path: note.path, type: "note" });
     setSelectedNote(note);
     setEditorContent(note.content);
     setReadPath(pathname);
+    setRestorePath(pathname);
+    setMoveFrom(pathname);
+  }
+
+  function selectFolder(pathname: string) {
+    setSelectedPath({ path: pathname, type: "folder" });
+    setSelectedNote(null);
+    setEditorContent("");
     setRestorePath(pathname);
     setMoveFrom(pathname);
   }
@@ -429,6 +445,7 @@ function WorkspacePage({
       method: "POST",
       body: { path: newNotePath, content: "" }
     });
+    setSelectedPath({ path: note.path, type: "note" });
     setSelectedNote(note);
     setEditorContent(note.content);
     await refreshWorkspace();
@@ -459,15 +476,26 @@ function WorkspacePage({
     await refreshWorkspace();
   }
 
-  async function deleteSelectedNote() {
-    if (!selectedNote) {
+  async function deleteSelectedPath() {
+    if (!selectedPath) {
       return;
     }
-    await apiJson("/api/notes", {
-      token,
-      method: "DELETE",
-      query: { path: selectedNote.path }
-    });
+
+    if (selectedPath.type === "note") {
+      await apiJson("/api/notes", {
+        token,
+        method: "DELETE",
+        query: { path: selectedPath.path }
+      });
+    } else {
+      await apiJson("/api/folders", {
+        token,
+        method: "DELETE",
+        query: { path: selectedPath.path }
+      });
+    }
+
+    setSelectedPath(null);
     setSelectedNote(null);
     setEditorContent("");
     await refreshWorkspace();
@@ -494,6 +522,7 @@ function WorkspacePage({
 
   async function discardChanges() {
     await apiJson("/api/version/discard", { token, method: "POST" });
+    setSelectedPath(null);
     setSelectedNote(null);
     setEditorContent("");
     await refreshWorkspace();
@@ -678,8 +707,9 @@ function WorkspacePage({
                 <TreeItem
                   key={node.path}
                   node={node}
-                  selectedPath={selectedNote?.path}
-                  onSelect={(path) => void runAction(() => loadNote(path))}
+                  selectedPath={selectedPath?.path}
+                  onSelectNote={(path) => void runAction(() => loadNote(path))}
+                  onSelectFolder={selectFolder}
                 />
               ))
             ) : (
@@ -691,7 +721,7 @@ function WorkspacePage({
         <section className="content">
           <header className="toolbar">
             <div>
-              <strong>{selectedNote?.path ?? "No note selected"}</strong>
+              <strong>{currentPathLabel}</strong>
               {hasDirtyEditor && <span className="dirty">Unsaved</span>}
             </div>
             <div className="toolbar-actions">
@@ -706,8 +736,8 @@ function WorkspacePage({
                 Save
               </button>
               <button
-                onClick={() => void runAction(deleteSelectedNote)}
-                disabled={!selectedNote || busy}
+                onClick={() => void runAction(deleteSelectedPath)}
+                disabled={!selectedPath || busy}
               >
                 Delete
               </button>
@@ -846,24 +876,29 @@ function WorkspacePage({
 function TreeItem({
   node,
   selectedPath,
-  onSelect
+  onSelectNote,
+  onSelectFolder
 }: {
   node: TreeNode;
   selectedPath?: string;
-  onSelect: (path: string) => void;
+  onSelectNote: (path: string) => void;
+  onSelectFolder: (path: string) => void;
 }) {
   const isNote = node.type === "note";
+  const isFolder = node.type === "folder";
   return (
     <div className="tree-node">
       <button
         className={`tree-item ${selectedPath === node.path ? "active" : ""}`}
         onClick={() => {
           if (isNote) {
-            onSelect(node.path);
+            onSelectNote(node.path);
+          } else if (isFolder) {
+            onSelectFolder(node.path);
           }
         }}
       >
-        <span>{node.type === "folder" ? "dir" : "md"}</span>
+        <span>{isFolder ? "dir" : isNote ? "md" : "file"}</span>
         {node.name || node.path}
       </button>
       {node.children?.length ? (
@@ -873,7 +908,8 @@ function TreeItem({
               key={child.path}
               node={child}
               selectedPath={selectedPath}
-              onSelect={onSelect}
+              onSelectNote={onSelectNote}
+              onSelectFolder={onSelectFolder}
             />
           ))}
         </div>
