@@ -16,15 +16,10 @@
 
 ## 运行环境
 
-Docker 开发、测试和部署需要：
+开发、测试和生产部署推荐使用 Docker 容器化环境。宿主机只需要：
 
 - Docker
 - Docker Compose
-
-宿主机直接运行仓库开发命令时，还需要：
-
-- Node.js 24+
-- Git
 
 只安装已发布 CLI 包时，Node.js 18+ 即可。
 
@@ -112,20 +107,12 @@ docker compose --env-file .env.dev --project-directory . -f docker/compose.yml d
 
 开发 Compose 项目名固定为 `notes-dev`，避免和测试、生产容器互相覆盖。
 
-宿主机直接运行开发进程：
+需要执行工程命令时，在开发容器内运行：
 
 ```bash
-npm install
-npm run dev
-```
-
-常用工程命令：
-
-```bash
-npm run migrate
-npm run lint
-npm run build
-npm test
+docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app npm run migrate
+docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app npm run lint
+docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app npm run build
 ```
 
 构建产物：
@@ -136,13 +123,13 @@ npm test
 
 ## 端到端测试
 
-默认测试入口：
+Docker 测试入口：
 
 ```bash
-npm test
+sh tests/run-e2e.sh
 ```
 
-`npm test` 会执行 `tests/run-e2e.sh`，启动 Docker 测试环境，然后在 `app` 容器内运行 `tests/full-test-runner.ts`。总入口会依次执行：
+`tests/run-e2e.sh` 会启动 Docker 测试环境，然后在 `app` 容器内运行 `tests/full-test-runner.ts`。总入口会依次执行：
 
 1. `tests/api/full-test.ts`
 2. `tests/cli/full-test.ts`
@@ -328,12 +315,6 @@ curl -s http://localhost:8080/api/version/commit \
 
 ## CLI 使用
 
-仓库开发环境中运行：
-
-```bash
-NOTES_API_URL=http://localhost:8080 npm run notes -- health
-```
-
 已启动开发容器后运行真实 CLI：
 
 ```bash
@@ -429,12 +410,11 @@ notes status --json
 
 CLI 对外发布包位于 `packages/cli`，npm 包名是 `cloud-markdown-notes`，当前可通过 `npm install -g cloud-markdown-notes` 直接安装。
 
-维护者发布新版本前，先在仓库根目录跑完整测试，再检查包内容：
+维护者发布新版本前，先运行 Docker 完整测试，再在开发容器内检查包内容：
 
 ```bash
-npm test
-cd packages/cli
-npm pack --dry-run
+sh tests/run-e2e.sh
+docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app sh -lc 'cd packages/cli && npm pack --dry-run'
 ```
 
 `packages/cli/package.json` 的 `bin.notes` 指向 `dist/index.js`。执行 `npm pack` 或 `npm publish` 时，`prepack` 会回到仓库根目录执行 `npm run build:cli`，把 `src/cli/index.ts` 构建进 CLI 包。
