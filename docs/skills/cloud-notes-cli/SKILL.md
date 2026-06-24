@@ -309,7 +309,7 @@ Use this sequence for reliable CLI operation:
 2. Run `notes health --json`.
 3. Log in with `notes auth login <username> <password>`, or register and ask/admin-activate if needed.
 4. Verify identity with `notes auth me --json`.
-5. Inspect state with `notes tree --json`, `notes status --json`, and `notes history --json`.
+5. Inspect state with `notes tree --json`, `notes status --json`, and `notes history --json`; use `notes show <sha> --json` for a specific commit's details and patch.
 6. Run mutating commands only after the target path and active user are clear.
 7. Prefer `--json` for machine-readable outputs and parse `data` or `error`.
 8. Quote every path, glob, regex, and Markdown string that may contain shell metacharacters.
