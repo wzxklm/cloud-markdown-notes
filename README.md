@@ -8,7 +8,7 @@
 - 每个用户独立 workspace，普通用户最多 1000 篇 `.md` 笔记，管理员不受该限制。
 - 文件夹和 Markdown 笔记的创建、读取、编辑、移动、删除；空文件夹会通过 `.notes-meta/folders.json` 保留。
 - 笔记编辑使用 `fileVersion` 和 `ifMatch` 做并发冲突保护。
-- Git 风格版本管理：`status`、`diff`、`commit`、`history`、`discard`、`restore`。
+- Git 风格版本管理：`status`、`diff`、`commit`、`history`、`show`、`discard`、`restore`。
 - Glob、Grep、Read 检索，仅面向工作区内的 Markdown 笔记和文件夹。
 - zip 导入、dry-run 冲突检查和 zip 导出。
 - 单篇已提交笔记公开分享；分享固定到发布时的 commit，取消发布或删除已提交文件后失效。
@@ -259,6 +259,7 @@ GET    /api/version/status
 GET    /api/version/diff
 POST   /api/version/commit
 GET    /api/version/history
+GET    /api/version/show?commit=<sha>
 POST   /api/version/discard
 POST   /api/version/restore
 
@@ -384,6 +385,7 @@ notes status
 notes diff
 notes commit -m "save notes"
 notes history
+notes show <sha>
 notes discard
 notes restore --commit <sha> --path /docs/a.md --type file
 
@@ -443,7 +445,7 @@ http://localhost:5173
 2. 普通用户注册后，管理员在 `admin` 页签中加载待激活用户并激活。
 3. 普通用户登录后，在左侧工作区树创建文件夹和笔记。
 4. 中间区域编辑 Markdown，右侧实时预览；保存时使用 `fileVersion` 防止覆盖服务器上的新版本。
-5. `version` 页签查看 status、diff、提交历史、恢复路径和丢弃未提交变更。
+5. `version` 页签查看 status、diff、提交历史、历史提交详情、恢复路径和丢弃未提交变更。
 6. `search` 页签使用 Glob、Grep、Read。
 7. `transfer` 页签导出 zip，或选择 zip 做 dry-run 与正式导入。
 8. `shares` 页签发布当前已提交笔记并生成公开链接，取消发布后链接失效。

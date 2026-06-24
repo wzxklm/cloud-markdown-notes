@@ -37,6 +37,11 @@ type Commit = {
   committedAt?: string;
 };
 
+type CommitDetail = {
+  commit: Commit;
+  diff: string;
+};
+
 type Share = {
   id: string;
   notePath: string;
@@ -607,6 +612,23 @@ async function main(): Promise<void> {
       token: userToken
     });
     assertEqual(history.data.commits[0]?.message, "api full initial", "Latest history message");
+    const show = await apiJson<ApiSuccess<{ show: CommitDetail }>>(
+      `version/show?commit=${firstCommitSha}`,
+      { token: userToken }
+    );
+    assertEqual(show.data.show.commit.sha, firstCommitSha, "Show commit sha");
+    assertEqual(show.data.show.commit.message, "api full initial", "Show commit message");
+    assert(show.data.show.diff.includes("+# A"), "Show diff should include added note.");
+    const invalidShowSha = await apiJson<ApiErrorBody>("version/show?commit=not-a-sha", {
+      token: userToken,
+      expectedStatus: 400
+    });
+    assertErrorCode(invalidShowSha, "VALIDATION_ERROR");
+    const missingShowCommit = await apiJson<ApiErrorBody>("version/show?commit=abcdef0", {
+      token: userToken,
+      expectedStatus: 404
+    });
+    assertErrorCode(missingShowCommit, "PATH_NOT_FOUND");
     const missingCommit = await apiJson<ApiErrorBody>("version/restore", {
       method: "POST",
       token: userToken,

@@ -77,6 +77,11 @@ type Commit = {
   committedAt: string;
 };
 
+type CommitDetail = {
+  commit: Commit;
+  diff: string;
+};
+
 type SearchMatch = {
   path: string;
   type: "folder" | "note";
@@ -297,6 +302,7 @@ function printHelp(io: CliIo): void {
   notes diff
   notes commit -m "message"
   notes history
+  notes show <sha>
   notes discard
   notes restore --commit <sha> --path <path> [--type file|folder]
   notes search glob <pattern>
@@ -520,6 +526,24 @@ async function executeCommand(command: string[], options: CliOptions): Promise<C
           : result.data.commits.map(
               (commit) => `${commit.sha.slice(0, 12)} ${commit.committedAt} ${commit.message}`
             )
+    };
+  }
+
+  if (scope === "show") {
+    const parsed = parseCommandArgs([action, ...rest].filter(isDefinedString));
+    const commitSha =
+      parsed.positionals[0] ?? stringFlag(parsed, "commit") ?? stringFlag(parsed, "commitSha");
+    requireString(commitSha, "Commit sha is required.");
+    const result = await apiRequest<ApiSuccess<{ show: CommitDetail }>>(
+      options,
+      "/api/version/show",
+      {
+        query: { commit: commitSha }
+      }
+    );
+    return {
+      raw: result,
+      human: formatCommitDetail(result.data.show)
     };
   }
 
@@ -1121,6 +1145,17 @@ function appendTreeNode(lines: string[], node: TreeNode, depth: number): void {
   for (const child of node.children ?? []) {
     appendTreeNode(lines, child, depth + 1);
   }
+}
+
+function formatCommitDetail(show: CommitDetail): string {
+  const header = [
+    `commit ${show.commit.sha}`,
+    `Date: ${show.commit.committedAt}`,
+    "",
+    `    ${show.commit.message}`
+  ].join("\n");
+
+  return show.diff ? `${header}\n\n${show.diff}` : header;
 }
 
 function stringFlag(parsed: ParsedCommandArgs, name: string): string | undefined {

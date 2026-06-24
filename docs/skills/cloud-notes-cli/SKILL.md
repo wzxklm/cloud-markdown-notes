@@ -179,6 +179,13 @@ View history:
 notes history --json
 ```
 
+View one commit's details and patch:
+
+```bash
+notes show <sha>
+notes show <sha> --json
+```
+
 Discard uncommitted changes:
 
 ```bash

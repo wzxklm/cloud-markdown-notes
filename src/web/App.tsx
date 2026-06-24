@@ -42,6 +42,11 @@ type Commit = {
   committedAt: string;
 };
 
+type CommitDetail = {
+  commit: Commit;
+  diff: string;
+};
+
 type SearchMatch = {
   path: string;
   type: "folder" | "note";
@@ -337,6 +342,7 @@ function WorkspacePage({
   const [status, setStatus] = useState<GitChange[]>([]);
   const [diff, setDiff] = useState("");
   const [history, setHistory] = useState<Commit[]>([]);
+  const [commitDetail, setCommitDetail] = useState<CommitDetail | null>(null);
   const [shares, setShares] = useState<Share[]>([]);
   const [tab, setTab] = useState<ToolTab>("version");
   const [message, setMessage] = useState("");
@@ -518,6 +524,15 @@ function WorkspacePage({
   async function refreshDiff() {
     const { diff: nextDiff } = await apiJson<{ diff: string }>("/api/version/diff", { token });
     setDiff(nextDiff);
+  }
+
+  async function showCommit(commitSha: string) {
+    const { show } = await apiJson<{ show: CommitDetail }>("/api/version/show", {
+      token,
+      query: { commit: commitSha }
+    });
+    setCommitDetail(show);
+    setRestoreCommit(show.commit.sha);
   }
 
   async function discardChanges() {
@@ -787,6 +802,7 @@ function WorkspacePage({
                   status={status}
                   diff={diff}
                   history={history}
+                  commitDetail={commitDetail}
                   commitMessage={commitMessage}
                   restoreCommit={restoreCommit}
                   restorePath={restorePath}
@@ -801,6 +817,7 @@ function WorkspacePage({
                   setMoveTo={setMoveTo}
                   onCommit={() => void runAction(commitChanges)}
                   onRefreshDiff={() => void runAction(refreshDiff)}
+                  onShowCommit={(commitSha) => void runAction(() => showCommit(commitSha))}
                   onDiscard={() => void runAction(discardChanges, "Changes discarded")}
                   onRestore={() => void runAction(restoreFromHistory, "Path restored")}
                   onMove={() => void runAction(movePath, "Path moved")}
@@ -922,6 +939,7 @@ function VersionTools(props: {
   status: GitChange[];
   diff: string;
   history: Commit[];
+  commitDetail: CommitDetail | null;
   commitMessage: string;
   restoreCommit: string;
   restorePath: string;
@@ -936,6 +954,7 @@ function VersionTools(props: {
   setMoveTo: (value: string) => void;
   onCommit: () => void;
   onRefreshDiff: () => void;
+  onShowCommit: (commitSha: string) => void;
   onDiscard: () => void;
   onRestore: () => void;
   onMove: () => void;
@@ -984,11 +1003,26 @@ function VersionTools(props: {
               <button className="link-button" onClick={() => props.setRestoreCommit(commit.sha)}>
                 {commit.sha.slice(0, 10)}
               </button>{" "}
-              {commit.message}
+              {commit.message}{" "}
+              <button className="link-button" onClick={() => props.onShowCommit(commit.sha)}>
+                Show
+              </button>
             </li>
           ))}
         </ul>
       </section>
+
+      {props.commitDetail && (
+        <section>
+          <h2>Commit</h2>
+          <div className="commit-summary">
+            <p>{props.commitDetail.commit.sha}</p>
+            <p>{props.commitDetail.commit.committedAt}</p>
+            <p>{props.commitDetail.commit.message}</p>
+          </div>
+          <pre className="commit-diff">{props.commitDetail.diff || "No diff"}</pre>
+        </section>
+      )}
 
       <section className="form-grid">
         <input

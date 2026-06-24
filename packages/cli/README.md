@@ -24,3 +24,14 @@ notes --api-url https://notes.example.com health
 
 Configuration is stored at `~/.config/cloud-markdown-notes/config.json` by default.
 Set `NOTES_CONFIG_PATH` to use a different config file.
+
+## Versioning
+
+```bash
+notes status
+notes diff
+notes commit -m "save notes"
+notes history
+notes show <sha>
+notes restore --commit <sha> --path /docs/a.md --type file
+```

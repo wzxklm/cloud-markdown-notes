@@ -540,6 +540,24 @@ async function main(): Promise<void> {
       configPath: userConfigPath
     });
     assertEqual(history.data.commits[0]?.message, "cli full initial", "Latest history message");
+    const show = await runJson<{
+      data: { show: { commit: { sha: string; message: string }; diff: string } };
+    }>(["show", firstCommitSha], {
+      configPath: userConfigPath
+    });
+    assertEqual(show.data.show.commit.sha, firstCommitSha, "Show commit sha");
+    assertEqual(show.data.show.commit.message, "cli full initial", "Show commit message");
+    assert(show.data.show.diff.includes("+# A"), "Show diff should include added note.");
+    const humanShow = await runNotes(["show", firstCommitSha], {
+      configPath: userConfigPath
+    });
+    assert(humanShow.stdout.includes(`commit ${firstCommitSha}`), "Human show should include sha.");
+    assert(humanShow.stdout.includes("cli full initial"), "Human show should include message.");
+    const invalidShowSha = await runNotes(["show", "not-a-sha", "--json"], {
+      configPath: userConfigPath,
+      expectFailure: true
+    });
+    assert(invalidShowSha.stderr.includes("VALIDATION_ERROR"), "Invalid show sha should fail.");
     const emptyCommit = await runNotes(["commit", "-m", "empty", "--json"], {
       configPath: userConfigPath,
       expectFailure: true

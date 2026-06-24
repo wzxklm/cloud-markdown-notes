@@ -401,6 +401,7 @@ label {
 
 .markdown-preview pre,
 .diff-box,
+.commit-diff,
 .read-box {
   overflow: auto;
   border: 1px solid #d7dee2;
@@ -462,6 +463,23 @@ label {
 
 .diff-box {
   max-height: 260px;
+  margin: 0;
+}
+
+.commit-summary {
+  display: grid;
+  gap: 4px;
+  color: #3d4a50;
+  font-size: 12px;
+}
+
+.commit-summary p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.commit-diff {
+  max-height: 360px;
   margin: 0;
 }
 

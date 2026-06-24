@@ -28,6 +28,11 @@ type CommitBody = {
   message?: unknown;
 };
 
+type ShowQuery = {
+  commit?: unknown;
+  commitSha?: unknown;
+};
+
 type RestoreBody = {
   commit?: unknown;
   commitSha?: unknown;
@@ -138,6 +143,27 @@ export function registerVersionRoutes(app: FastifyInstance, config: AppConfig, d
       const userWorkspacePath = await ensureUserGitWorkspace(config.workspaceRoot, user.id);
       return apiSuccess({
         commits: await getGitHistory(userWorkspacePath)
+      });
+    }
+  );
+
+  app.get<{ Querystring: ShowQuery }>(
+    "/api/version/show",
+    {
+      preHandler: [authenticate]
+    },
+    async (request, reply) => {
+      const user = requireCurrentUser(request, reply);
+      if (!user) {
+        return;
+      }
+
+      const requestedCommitSha = readCommitSha(request.query);
+      const userWorkspacePath = await ensureUserGitWorkspace(config.workspaceRoot, user.id);
+      const commitSha = await resolveCommitSha(userWorkspacePath, requestedCommitSha);
+
+      return apiSuccess({
+        show: await getGitCommitDetail(userWorkspacePath, commitSha)
       });
     }
   );
@@ -265,6 +291,29 @@ async function getGitHistory(userWorkspacePath: string) {
         committedAt
       };
     });
+}
+
+async function getGitCommitDetail(userWorkspacePath: string, commitSha: string) {
+  const [metadata, diff] = await Promise.all([
+    runGit(userWorkspacePath, [
+      "show",
+      "--no-patch",
+      "--date=iso-strict",
+      "--pretty=format:%H%x00%cI%x00%s",
+      commitSha
+    ]),
+    runGit(userWorkspacePath, ["show", "--format=", "--patch", "--find-renames", commitSha])
+  ]);
+  const [sha, committedAt, message] = metadata.split("\0");
+
+  return {
+    commit: {
+      sha,
+      message,
+      committedAt
+    },
+    diff: diff.trimEnd()
+  };
 }
 
 async function restoreFromHistory(
@@ -554,6 +603,15 @@ function readCommitMessage(body: CommitBody | undefined): string {
   }
 
   return body.message.trim();
+}
+
+function readCommitSha(source: ShowQuery | undefined): string {
+  const commitSha = typeof source?.commitSha === "string" ? source.commitSha : source?.commit;
+  if (typeof commitSha !== "string" || !commitSha.trim()) {
+    throw new WorkspaceError("VALIDATION_ERROR", "commitSha is required.");
+  }
+
+  return commitSha.trim();
 }
 
 function readRestoreBody(body: RestoreBody | undefined): {

@@ -29,6 +29,10 @@ test("creates, edits, versions, moves, restores, discards, and deletes notes", a
 
   await commitInUi(page, "web notes initial");
   await expect(page.getByText("web notes initial")).toBeVisible();
+  await page.getByRole("button", { name: "Show" }).first().click();
+  await expect(page.getByRole("heading", { name: "Commit" })).toBeVisible();
+  await expect(page.locator(".commit-summary")).toContainText("web notes initial");
+  await expect(page.locator(".commit-diff")).toContainText("+# Alpha");
 
   await page.getByLabel("Markdown editor").fill("# Beta\n\nAction Item\n");
   await page.getByRole("button", { name: "Save" }).click();
