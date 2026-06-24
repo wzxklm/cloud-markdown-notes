@@ -518,6 +518,19 @@ async function main(): Promise<void> {
       status.data.changes.some((change) => change.path === "/notes/a.md"),
       "Status should include /notes/a.md."
     );
+    await runJson(
+      ["note", "create", "/notes/开发习惯.md", "--content", "# 开发习惯\n"],
+      {
+        configPath: userConfigPath
+      }
+    );
+    const unicodeStatus = await runJson<{ data: { changes: { path: string }[] } }>(["status"], {
+      configPath: userConfigPath
+    });
+    assert(
+      unicodeStatus.data.changes.some((change) => change.path === "/notes/开发习惯.md"),
+      "Status should preserve non-ASCII note paths."
+    );
     const diff = await runJson<{ data: { diff: string } }>(["diff"], {
       configPath: userConfigPath
     });

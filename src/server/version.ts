@@ -223,11 +223,12 @@ export function registerVersionRoutes(app: FastifyInstance, config: AppConfig, d
 async function getGitStatusChanges(userWorkspacePath: string): Promise<GitStatusChange[]> {
   const output = await runGit(userWorkspacePath, [
     "status",
-    "--porcelain",
-    "--untracked-files=all"
+    "--porcelain=v1",
+    "--untracked-files=all",
+    "-z"
   ]);
 
-  return output.split("\n").filter(Boolean).map(parseGitStatusLine);
+  return parseGitStatusOutput(output);
 }
 
 async function getGitDiff(userWorkspacePath: string): Promise<string> {
@@ -483,11 +484,11 @@ async function listFilesInCommit(
   relativePath: string
 ): Promise<string[]> {
   const args = relativePath
-    ? ["ls-tree", "-r", "--name-only", commitSha, "--", relativePath]
-    : ["ls-tree", "-r", "--name-only", commitSha];
+    ? ["ls-tree", "-r", "-z", "--name-only", commitSha, "--", relativePath]
+    : ["ls-tree", "-r", "-z", "--name-only", commitSha];
   const output = await runGit(userWorkspacePath, args);
 
-  return output.split("\n").filter(Boolean);
+  return output.split("\0").filter(Boolean);
 }
 
 async function getCommitObjectType(
@@ -637,6 +638,39 @@ function readRestoreBody(body: RestoreBody | undefined): {
     path: normalizeApiPath(body.path),
     type: body.type
   };
+}
+
+function parseGitStatusOutput(output: string): GitStatusChange[] {
+  const records = output.split("\0").filter(Boolean);
+  const changes: GitStatusChange[] = [];
+
+  for (let index = 0; index < records.length; index += 1) {
+    const line = records[index] ?? "";
+    const indexStatus = line[0] ?? " ";
+    const worktreeStatus = line[1] ?? " ";
+    const rawPath = line.slice(3);
+
+    if (indexStatus === "R" || indexStatus === "C") {
+      const oldPath = records[index + 1];
+      if (oldPath === undefined) {
+        changes.push(parseGitStatusLine(line));
+      } else {
+        changes.push({
+          path: gitPathToApiPath(rawPath),
+          oldPath: gitPathToApiPath(oldPath),
+          changeType: indexStatus === "R" ? "renamed" : "copied",
+          indexStatus,
+          worktreeStatus
+        });
+        index += 1;
+      }
+      continue;
+    }
+
+    changes.push(parseGitStatusLine(line));
+  }
+
+  return changes;
 }
 
 function parseGitStatusLine(line: string): GitStatusChange {

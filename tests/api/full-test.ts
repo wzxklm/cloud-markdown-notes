@@ -576,6 +576,19 @@ async function main(): Promise<void> {
       status.data.changes.some((change) => change.path === "/notes/a.md"),
       "Status should include /notes/a.md."
     );
+    await apiJson("notes", {
+      method: "POST",
+      token: userToken,
+      expectedStatus: 201,
+      body: { path: "/notes/开发习惯.md", content: "# 开发习惯\n" }
+    });
+    const unicodeStatus = await apiJson<
+      ApiSuccess<{ changes: { path: string; changeType: string }[] }>
+    >("version/status", { token: userToken });
+    assert(
+      unicodeStatus.data.changes.some((change) => change.path === "/notes/开发习惯.md"),
+      "Status should preserve non-ASCII note paths."
+    );
     const diff = await apiJson<ApiSuccess<{ diff: string }>>("version/diff", { token: userToken });
     assert(diff.data.diff.includes("+# A"), "Diff should include note content.");
     const emptyMessage = await apiJson<ApiErrorBody>("version/commit", {
