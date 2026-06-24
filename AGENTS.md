@@ -26,6 +26,8 @@
 - Web 测试入口是 `tests/web/*.spec.ts`，公共辅助函数位于 `tests/web/helpers.ts`。
 - 测试运行时数据放在 `runtime/fulltest-docker`，不会污染 `runtime/dev` 和 `runtime/prod`。
 - 新增、删除或修改可测试功能时，应先更新 `docs/可测试功能.md`；API、CLI、Web 全功能测试脚本应以该文件作为覆盖清单同步维护。
+- 新增、删除或修改用户可见功能、命令、接口、部署流程或测试流程时，应同步更新 `README.md` 中对应的使用说明、API/CLI 命令清单和 Web 流程说明。
+- 新增、删除或修改 CLI 能力时，应同步更新 `packages/cli/README.md` 和 `docs/skills/cloud-notes-cli/SKILL.md`；如果该能力也影响本机已安装的 Codex skill，应同步更新 `/root/.codex/skills/cloud-notes-cli/SKILL.md`。
 - 只有当需求涉及真实 Web UI 体验、视觉状态、复杂交互手感或自动化测试无法覆盖的问题时，才使用浏览器 MCP 进行 AI 手动实测。
 - 使用浏览器 MCP 手动测试时，应优先复用 Docker 暴露到主机的 Web 端口，并覆盖关键用户路径，而不是只做页面是否能打开的浅层检查。
 
