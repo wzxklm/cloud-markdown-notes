@@ -667,6 +667,10 @@ async function main(): Promise<void> {
     );
     const diff = await apiJson<ApiSuccess<{ diff: string }>>("version/diff", { token: userToken });
     assert(diff.data.diff.includes("+# A"), "Diff should include note content.");
+    assert(
+      diff.data.diff.includes("notes/开发习惯.md"),
+      "Diff should preserve non-ASCII note paths."
+    );
     const emptyMessage = await apiJson<ApiErrorBody>("version/commit", {
       method: "POST",
       token: userToken,
@@ -708,6 +712,10 @@ async function main(): Promise<void> {
     assertEqual(show.data.show.commit.sha, firstCommitSha, "Show commit sha");
     assertEqual(show.data.show.commit.message, "api full initial", "Show commit message");
     assert(show.data.show.diff.includes("+# A"), "Show diff should include added note.");
+    assert(
+      show.data.show.diff.includes("notes/开发习惯.md"),
+      "Show diff should preserve non-ASCII note paths."
+    );
     const invalidShowSha = await apiJson<ApiErrorBody>("version/show?commit=not-a-sha", {
       token: userToken,
       expectedStatus: 400

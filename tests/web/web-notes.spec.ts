@@ -17,10 +17,10 @@ test("creates, edits, versions, moves, restores, discards, and deletes notes", a
   await expect(page.getByText("Folder created")).toBeVisible();
   await expect(page.getByRole("button", { name: "empty" })).toBeVisible();
 
-  await createNoteInUi(page, "/docs/a.md", "# Alpha\n\nAction Item\n");
+  await createNoteInUi(page, "/docs/开发习惯.md", "# Alpha\n\nAction Item\n");
   await expect(page.getByRole("heading", { name: "Alpha" })).toBeVisible();
   await expect(page.locator(".markdown-preview")).toContainText("Action Item");
-  await expect(page.getByText("untracked /docs/a.md")).toBeVisible();
+  await expect(page.getByText("untracked /docs/开发习惯.md")).toBeVisible();
 
   await createNoteInUi(
     page,
@@ -44,12 +44,13 @@ test("creates, edits, versions, moves, restores, discards, and deletes notes", a
   await expect(previewCodeBlocks.first()).toContainText("```bash");
   await expect(previewCodeBlocks.first()).toContainText("notes health --json");
 
-  await page.getByRole("button", { name: "a.md" }).click();
+  await page.getByRole("button", { name: "开发习惯.md" }).click();
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(page.getByRole("heading", { name: "Alpha" })).toBeVisible();
 
   await page.getByRole("button", { name: "Diff" }).click();
   await expect(page.locator(".diff-box")).toContainText("+# Alpha");
+  await expect(page.locator(".diff-box")).toContainText("docs/开发习惯.md");
 
   await commitInUi(page, "web notes initial");
   await expect(page.getByText("web notes initial")).toBeVisible();
@@ -57,11 +58,12 @@ test("creates, edits, versions, moves, restores, discards, and deletes notes", a
   await expect(page.getByRole("heading", { name: "Commit" })).toBeVisible();
   await expect(page.locator(".commit-summary")).toContainText("web notes initial");
   await expect(page.locator(".commit-diff")).toContainText("+# Alpha");
+  await expect(page.locator(".commit-diff")).toContainText("docs/开发习惯.md");
 
   await page.getByLabel("Markdown editor").fill("# Beta\n\nAction Item\n");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.locator(".notice")).toHaveText("Saved");
-  await expect(page.getByText("modified /docs/a.md")).toBeVisible();
+  await expect(page.getByText("modified /docs/开发习惯.md")).toBeVisible();
 
   await page.getByRole("button", { name: "Diff" }).click();
   await expect(page.locator(".diff-box")).toContainText("-# Alpha");
@@ -72,14 +74,14 @@ test("creates, edits, versions, moves, restores, discards, and deletes notes", a
     .first()
     .click();
   const firstCommit = await page.getByLabel("Restore commit").inputValue();
-  await page.getByLabel("Restore path").fill("/docs/a.md");
+  await page.getByLabel("Restore path").fill("/docs/开发习惯.md");
   await page.getByLabel("Restore type").selectOption("file");
   await page.getByRole("button", { name: "Restore" }).click();
   await expect(page.getByText("Path restored")).toBeVisible();
-  await page.getByRole("button", { name: "a.md" }).click();
+  await page.getByRole("button", { name: "开发习惯.md" }).click();
   await expect(page.getByRole("heading", { name: "Alpha" })).toBeVisible();
 
-  await page.getByLabel("Move from").fill("/docs/a.md");
+  await page.getByLabel("Move from").fill("/docs/开发习惯.md");
   await page.getByLabel("Move to").fill("/docs/b.md");
   await page.getByRole("button", { name: "Move" }).click();
   await expect(page.getByText("Path moved")).toBeVisible();
@@ -113,11 +115,11 @@ test("creates, edits, versions, moves, restores, discards, and deletes notes", a
   await expect(page.getByText("Path restored")).toBeVisible();
   await expect(page.getByRole("button", { name: "empty" })).toBeVisible();
 
-  await page.getByRole("button", { name: "a.md" }).click();
+  await page.getByRole("button", { name: "开发习惯.md" }).click();
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("No note selected")).toBeVisible();
 
-  await page.getByLabel("Restore path").fill("/docs/a.md");
+  await page.getByLabel("Restore path").fill("/docs/开发习惯.md");
   await page.getByLabel("Restore type").selectOption("folder");
   await page.getByRole("button", { name: "Restore" }).click();
   await expect(page.getByText("The path is invalid.")).toBeVisible();

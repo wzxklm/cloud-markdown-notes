@@ -604,6 +604,10 @@ async function main(): Promise<void> {
       configPath: userConfigPath
     });
     assert(diff.data.diff.includes("+# A"), "Diff should include added note.");
+    assert(
+      diff.data.diff.includes("notes/开发习惯.md"),
+      "Diff should preserve non-ASCII note paths."
+    );
     const missingMessage = await runNotes(["commit", "--json"], {
       configPath: userConfigPath,
       expectFailure: true
@@ -630,6 +634,10 @@ async function main(): Promise<void> {
     assertEqual(show.data.show.commit.sha, firstCommitSha, "Show commit sha");
     assertEqual(show.data.show.commit.message, "cli full initial", "Show commit message");
     assert(show.data.show.diff.includes("+# A"), "Show diff should include added note.");
+    assert(
+      show.data.show.diff.includes("notes/开发习惯.md"),
+      "Show diff should preserve non-ASCII note paths."
+    );
     const humanShow = await runNotes(["show", firstCommitSha], {
       configPath: userConfigPath
     });

@@ -22,6 +22,7 @@ import {
 
 const execFileAsync = promisify(execFile);
 const gitMaxBuffer = 20 * 1024 * 1024;
+const gitGlobalOptions = ["-c", "core.quotepath=false"];
 const protectedPathSegments = new Set([".git", ".notes-meta"]);
 
 type CommitBody = {
@@ -775,7 +776,7 @@ async function runGit(
   allowedExitCodes: readonly number[] = [0]
 ): Promise<string> {
   try {
-    const { stdout } = await execFileAsync("git", args, {
+    const { stdout } = await execFileAsync("git", [...gitGlobalOptions, ...args], {
       cwd,
       maxBuffer: gitMaxBuffer,
       timeout: 10000

@@ -177,6 +177,8 @@ notes status --json
 notes diff
 ```
 
+Status and patch diff output preserve non-ASCII paths as their original filenames.
+
 Commit all current workspace changes:
 
 ```bash

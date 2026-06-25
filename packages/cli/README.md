@@ -49,3 +49,5 @@ notes history
 notes show <sha>
 notes restore --commit <sha> --path /docs/a.md --type file
 ```
+
+Versioning status and patch diff output preserve non-ASCII paths as their original filenames.

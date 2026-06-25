@@ -440,6 +440,8 @@ notes share list
 notes share unpublish <share-id>
 ```
 
+版本管理命令返回的状态和 patch diff 会保留非 ASCII 路径的原始文件名。
+
 所有命令都支持 `--json` 输出脚本友好的 JSON：
 
 ```bash
