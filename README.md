@@ -6,7 +6,7 @@
 
 - 用户注册、登录、退出、会话校验，以及管理员激活普通用户。
 - 每个用户独立 workspace，普通用户最多 1000 篇 `.md` 笔记，管理员不受该限制。
-- 文件夹和 Markdown 笔记的创建、读取、编辑、移动、删除；空文件夹会通过 `.notes-meta/folders.json` 保留。
+- 文件夹和 Markdown 笔记的创建、读取、整篇替换、局部行编辑、移动、删除；空文件夹会通过 `.notes-meta/folders.json` 保留。
 - 笔记编辑使用 `fileVersion` 和 `ifMatch` 做并发冲突保护。
 - Git 风格版本管理：`status`、`diff`、`commit`、`history`、`show`、`discard`、`restore`。
 - Glob、Grep、Read 检索，仅面向工作区内的 Markdown 笔记和文件夹。
@@ -253,6 +253,7 @@ GET    /api/tree
 POST   /api/notes
 GET    /api/notes?path=/docs/a.md
 PUT    /api/notes?path=/docs/a.md
+PATCH  /api/notes?path=/docs/a.md
 PATCH  /api/notes/move
 DELETE /api/notes?path=/docs/a.md
 
@@ -304,7 +305,15 @@ curl -s 'http://localhost:8080/api/notes?path=/docs/a.md' \
   -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
   -d '{"content":"# B\n","ifMatch":"<fileVersion>"}'
+
+curl -s 'http://localhost:8080/api/notes?path=/docs/a.md' \
+  -X PATCH \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"ifMatch":"<fileVersion>","fromLine":2,"toLine":3,"content":"替换内容"}'
 ```
+
+`PATCH /api/notes` 使用从 1 开始的闭区间行号，`content` 可以是多行；`content:""` 表示删除该行范围。
 
 提交变更：
 
@@ -379,6 +388,8 @@ notes note create /docs/b.md --file local.md
 notes note read /docs/a.md
 notes note replace /docs/a.md --content "# B"
 notes note replace /docs/a.md --file local.md
+notes note edit /docs/a.md --from-line 10 --to-line 12 --content "替换内容"
+notes note edit /docs/a.md --from-line 10 --to-line 12 --content ""
 notes note mv /docs/a.md /docs/c.md
 notes note rm /docs/c.md
 
@@ -393,6 +404,10 @@ notes restore --commit <sha> --path /docs/a.md --type file
 notes search glob "**/*.md"
 notes search grep "todo" --ignore-case --glob "docs/**/*.md"
 notes search read /docs/a.md --offset 1 --limit 20
+
+notes search grep "目标内容" --json
+notes search read /docs/a.md --offset 20 --limit 20 --json
+notes note edit /docs/a.md --from-line 27 --to-line 31 --content "新内容"
 
 notes export -o notes.zip
 notes import notes.zip --dry-run

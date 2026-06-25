@@ -33,6 +33,11 @@ type ReplaceNoteBody = {
   ifMatch?: unknown;
 };
 
+type EditNoteBody = ReplaceNoteBody & {
+  fromLine?: unknown;
+  toLine?: unknown;
+};
+
 type MoveBody = {
   fromPath?: unknown;
   toPath?: unknown;
@@ -285,6 +290,35 @@ export function registerContentRoutes(app: FastifyInstance, config: AppConfig, d
     }
   );
 
+  app.patch<{ Querystring: PathQuery; Body: EditNoteBody }>(
+    "/api/notes",
+    {
+      preHandler: [authenticate]
+    },
+    async (request, reply) => {
+      const user = requireCurrentUser(request, reply);
+      if (!user) {
+        return;
+      }
+
+      const edit = readEditNoteBody(request.body);
+      const userWorkspacePath = await ensureUserGitWorkspace(config.workspaceRoot, user.id);
+      const notePath = readQueryPath(request.query);
+      const currentNote = await readExistingNote(userWorkspacePath, notePath);
+      if (currentNote.fileVersion !== edit.ifMatch) {
+        throw new WorkspaceError("EDIT_CONFLICT", "Note has been modified.", 409);
+      }
+
+      const workspacePath = resolveWorkspacePath(userWorkspacePath, notePath);
+      const content = applyLineEdit(currentNote.content, edit);
+      await writeFile(workspacePath.absolutePath, content, "utf8");
+
+      return apiSuccess({
+        note: toNoteResponse(workspacePath.apiPath, content)
+      });
+    }
+  );
+
   app.patch<{ Body: MoveBody }>(
     "/api/notes/move",
     {
@@ -397,6 +431,68 @@ function readIfMatch(ifMatch: unknown): string {
   }
 
   return ifMatch;
+}
+
+function readEditNoteBody(body: EditNoteBody | undefined): {
+  ifMatch: string;
+  fromLine: number;
+  toLine: number;
+  content: string;
+} {
+  const fromLine = readLineNumber(body?.fromLine, "fromLine");
+  const toLine = readLineNumber(body?.toLine, "toLine");
+  if (fromLine > toLine) {
+    throw new WorkspaceError("VALIDATION_ERROR", "fromLine must be less than or equal to toLine.");
+  }
+
+  return {
+    ifMatch: readIfMatch(body?.ifMatch),
+    fromLine,
+    toLine,
+    content: readRequiredContent(body?.content)
+  };
+}
+
+function readLineNumber(value: unknown, fieldName: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+    throw new WorkspaceError("VALIDATION_ERROR", `${fieldName} must be a positive integer.`);
+  }
+
+  return value;
+}
+
+function applyLineEdit(
+  currentContent: string,
+  edit: { fromLine: number; toLine: number; content: string }
+): string {
+  const currentLines = splitContentLines(currentContent);
+  if (edit.fromLine > currentLines.length || edit.toLine > currentLines.length) {
+    throw new WorkspaceError("VALIDATION_ERROR", "Line range is outside the current note.");
+  }
+
+  const replacementLines = edit.content === "" ? [] : splitContentLines(edit.content);
+  const nextLines = [
+    ...currentLines.slice(0, edit.fromLine - 1),
+    ...replacementLines,
+    ...currentLines.slice(edit.toLine)
+  ];
+  if (nextLines.length === 0) {
+    return "";
+  }
+
+  const preservesFinalLineEnding =
+    currentContent.endsWith("\n") ||
+    (edit.toLine === currentLines.length && edit.content.endsWith("\n"));
+  return `${nextLines.join("\n")}${preservesFinalLineEnding ? "\n" : ""}`;
+}
+
+function splitContentLines(content: string): string[] {
+  if (!content) {
+    return [];
+  }
+
+  const withoutFinalLineEnding = content.endsWith("\n") ? content.slice(0, -1) : content;
+  return withoutFinalLineEnding.split(/\r?\n/);
 }
 
 function assertMarkdownNotePath(apiPath: string): void {

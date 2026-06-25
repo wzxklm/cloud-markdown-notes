@@ -441,6 +441,75 @@ async function main(): Promise<void> {
       { configPath: userConfigPath }
     );
     assertEqual(replaced.data.note.content, "# A\nAction Item\nclosing\n", "Replaced note content");
+    const grepForEdit = await runJson<{ data: { matches: { path: string; lineNumber: number }[] } }>(
+      ["search", "grep", "Action Item"],
+      { configPath: userConfigPath }
+    );
+    assertEqual(grepForEdit.data.matches[0]?.lineNumber, 2, "Grep should find editable line");
+    const readForEdit = await runJson<{ data: { note: { content: string } } }>(
+      ["search", "read", "/notes/a.md", "--offset", "1", "--limit", "3"],
+      { configPath: userConfigPath }
+    );
+    assert(readForEdit.data.note.content.includes("Action Item"), "Read slice should include target.");
+    const edited = await runJson<{ data: { note: { content: string } } }>(
+      [
+        "note",
+        "edit",
+        "/notes/a.md",
+        "--from-line",
+        "2",
+        "--to-line",
+        "2",
+        "--content",
+        "First action\nSecond action"
+      ],
+      { configPath: userConfigPath }
+    );
+    assertEqual(
+      edited.data.note.content,
+      "# A\nFirst action\nSecond action\nclosing\n",
+      "Edited note content"
+    );
+    const deletedLines = await runJson<{ data: { note: { content: string } } }>(
+      [
+        "note",
+        "edit",
+        "/notes/a.md",
+        "--from-line",
+        "2",
+        "--to-line",
+        "3",
+        "--content",
+        ""
+      ],
+      { configPath: userConfigPath }
+    );
+    assertEqual(deletedLines.data.note.content, "# A\nclosing\n", "Deleted note line range");
+    const staleEdit = await runNotes(
+      [
+        "note",
+        "edit",
+        "/notes/a.md",
+        "--from-line",
+        "1",
+        "--to-line",
+        "1",
+        "--content",
+        "# Stale",
+        "--if-match",
+        "stale-version",
+        "--json"
+      ],
+      {
+        configPath: userConfigPath,
+        expectFailure: true
+      }
+    );
+    assert(staleEdit.stderr.includes("EDIT_CONFLICT"), "Stale edit should fail.");
+    await runJson(
+      ["note", "replace", "/notes/a.md", "--content", "# A\nAction Item\nclosing\n"],
+      { configPath: userConfigPath }
+    );
     const fileCreated = await runJson<{ data: { note: { path: string; content: string } } }>(
       ["note", "create", "/notes/from-file.md", "--file", `${commandWorkRoot}/replacement.md`],
       { configPath: userConfigPath }

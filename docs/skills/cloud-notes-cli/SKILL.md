@@ -151,6 +151,16 @@ notes note replace /docs/a.md --file local.md
 
 `note replace` automatically reads the current file version when `--if-match` is omitted. Use `--if-match <fileVersion>` only when explicitly testing conflict behavior.
 
+Edit a line range:
+
+```bash
+notes note edit /docs/a.md --from-line 10 --to-line 12 --content "Replacement"
+notes note edit /docs/a.md --from-line 10 --to-line 10 --content "Single replacement line"
+notes note edit /docs/a.md --from-line 10 --to-line 12 --content ""
+```
+
+`note edit` uses 1-based inclusive line numbers and only accepts `--content`. It automatically reads the current file version when `--if-match` is omitted. Use `--if-match <fileVersion>` only when explicitly testing conflict behavior.
+
 Move or delete notes:
 
 ```bash
@@ -310,6 +320,7 @@ Use this sequence for reliable CLI operation:
 3. Log in with `notes auth login <username> <password>`, or register and ask/admin-activate if needed.
 4. Verify identity with `notes auth me --json`.
 5. Inspect state with `notes tree --json`, `notes status --json`, and `notes history --json`; use `notes show <sha> --json` for a specific commit's details and patch.
-6. Run mutating commands only after the target path and active user are clear.
-7. Prefer `--json` for machine-readable outputs and parse `data` or `error`.
-8. Quote every path, glob, regex, and Markdown string that may contain shell metacharacters.
+6. For focused content edits, run `notes search grep "target" --json`, inspect the surrounding lines with `notes search read /docs/a.md --offset <n> --limit <n> --json`, then apply `notes note edit /docs/a.md --from-line <n> --to-line <n> --content "new content"`.
+7. Run mutating commands only after the target path and active user are clear.
+8. Prefer `--json` for machine-readable outputs and parse `data` or `error`.
+9. Quote every path, glob, regex, and Markdown string that may contain shell metacharacters.

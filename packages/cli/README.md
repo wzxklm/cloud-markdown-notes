@@ -25,6 +25,20 @@ notes --api-url https://notes.example.com health
 Configuration is stored at `~/.config/cloud-markdown-notes/config.json` by default.
 Set `NOTES_CONFIG_PATH` to use a different config file.
 
+## Notes
+
+```bash
+notes note create /docs/a.md --content "# A"
+notes note read /docs/a.md
+notes note replace /docs/a.md --content "# Updated"
+notes note edit /docs/a.md --from-line 10 --to-line 12 --content "Replacement"
+notes note edit /docs/a.md --from-line 10 --to-line 12 --content ""
+notes note mv /docs/a.md /docs/b.md
+notes note rm /docs/b.md
+```
+
+`note edit` performs a 1-based inclusive line-range replacement. It automatically reads the current `fileVersion` unless `--if-match <fileVersion>` is passed for explicit conflict testing.
+
 ## Versioning
 
 ```bash

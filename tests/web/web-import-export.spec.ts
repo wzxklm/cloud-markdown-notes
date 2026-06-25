@@ -40,8 +40,9 @@ test("searches notes and imports/exports zip archives", async ({ page, request }
 
   await page.getByRole("button", { name: "/search/a.md:3" }).click();
   await expect(page.getByRole("heading", { name: "Search" })).toBeVisible();
+  await expect(page.locator(".toolbar strong")).toHaveText("/search/a.md");
+  await expect(page.getByLabel("Read path")).toHaveValue("/search/a.md");
 
-  await page.getByLabel("Read path").fill("/search/a.md");
   await page.getByLabel("Read offset").fill("3");
   await page.getByLabel("Read limit").fill("1");
   await page.getByRole("button", { name: "Read" }).click();

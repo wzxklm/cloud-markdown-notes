@@ -254,7 +254,7 @@ function parseCommandArgs(args: string[]): ParsedCommandArgs {
         flags[rawName] = true;
       } else {
         const value = args[index + 1];
-        if (!value) {
+        if (value === undefined) {
           throw new Error(`--${rawName} requires a value.`);
         }
         flags[rawName] = value;
@@ -264,7 +264,7 @@ function parseCommandArgs(args: string[]): ParsedCommandArgs {
       const rawName = arg.slice(1);
       const name = shortFlagAliases[rawName] ?? rawName;
       const value = args[index + 1];
-      if (!value) {
+      if (value === undefined) {
         throw new Error(`-${rawName} requires a value.`);
       }
       flags[name] = value;
@@ -295,7 +295,8 @@ function printHelp(io: CliIo): void {
   notes tree
   notes note create <path> [--file local.md] [--content text]
   notes note read <path>
-  notes note replace <path> --file local.md
+  notes note replace <path> [--file local.md] [--content text]
+  notes note edit <path> --from-line n --to-line n --content text
   notes note mv <from> <to>
   notes note rm <path>
   notes status
@@ -904,6 +905,37 @@ async function handleNoteCommand(
     };
   }
 
+  if (action === "edit") {
+    const notePath = parsed.positionals[0];
+    requireString(notePath, "Note path is required.");
+    if (stringFlag(parsed, "line") !== undefined) {
+      throw new Error("--line is not supported for note edit. Use --from-line and --to-line.");
+    }
+    if (stringFlag(parsed, "file") !== undefined) {
+      throw new Error("--file is not supported for note edit. Use --content.");
+    }
+    const content = readInlineContentFromArgs(parsed);
+    const fromLine = requiredNumberFlag(parsed, "from-line");
+    const toLine = requiredNumberFlag(parsed, "to-line");
+    const ifMatch =
+      stringFlag(parsed, "if-match") ??
+      (
+        await apiRequest<ApiSuccess<{ note: Note }>>(options, "/api/notes", {
+          query: { path: notePath }
+        })
+      ).data.note.fileVersion;
+
+    const result = await apiRequest<ApiSuccess<{ note: Note }>>(options, "/api/notes", {
+      method: "PATCH",
+      query: { path: notePath },
+      body: { ifMatch, fromLine, toLine, content }
+    });
+    return {
+      raw: result,
+      human: `Edited note ${result.data.note.path}`
+    };
+  }
+
   if (action === "mv") {
     const [fromPath, toPath] = parsed.positionals;
     requireString(fromPath, "Source note path is required.");
@@ -1131,6 +1163,15 @@ async function readContentFromArgs(
   throw new Error("--file or --content is required.");
 }
 
+function readInlineContentFromArgs(parsed: ParsedCommandArgs): string {
+  const content = stringFlag(parsed, "content");
+  if (content === undefined) {
+    throw new Error("--content is required.");
+  }
+
+  return content;
+}
+
 function formatTree(root: TreeNode): string[] {
   const lines: string[] = [];
   for (const child of root.children ?? []) {
@@ -1184,6 +1225,15 @@ function numberFlag(parsed: ParsedCommandArgs, name: string): number | undefined
   }
 
   return parsedValue;
+}
+
+function requiredNumberFlag(parsed: ParsedCommandArgs, name: string): number {
+  const value = numberFlag(parsed, name);
+  if (value === undefined) {
+    throw new Error(`--${name} is required.`);
+  }
+
+  return value;
 }
 
 function requireString(value: string | undefined, message: string): asserts value is string {

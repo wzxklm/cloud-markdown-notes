@@ -484,6 +484,82 @@ async function main(): Promise<void> {
       }
     });
     assertEqual(replaced.data.note.content, "# A\nAction Item\nclosing\n", "Replaced note content");
+    const edited = await apiJson<ApiSuccess<{ note: Note }>>("notes?path=%2Fnotes%2Fa.md", {
+      method: "PATCH",
+      token: userToken,
+      body: {
+        ifMatch: replaced.data.note.fileVersion,
+        fromLine: 2,
+        toLine: 2,
+        content: "First action\nSecond action"
+      }
+    });
+    assertEqual(
+      edited.data.note.content,
+      "# A\nFirst action\nSecond action\nclosing\n",
+      "Edited note content"
+    );
+    const deletedLines = await apiJson<ApiSuccess<{ note: Note }>>("notes?path=%2Fnotes%2Fa.md", {
+      method: "PATCH",
+      token: userToken,
+      body: {
+        ifMatch: edited.data.note.fileVersion,
+        fromLine: 2,
+        toLine: 3,
+        content: ""
+      }
+    });
+    assertEqual(deletedLines.data.note.content, "# A\nclosing\n", "Deleted note line range");
+    const editConflict = await apiJson<ApiErrorBody>("notes?path=%2Fnotes%2Fa.md", {
+      method: "PATCH",
+      token: userToken,
+      expectedStatus: 409,
+      body: { ifMatch: "stale-version", fromLine: 1, toLine: 1, content: "# Stale" }
+    });
+    assertErrorCode(editConflict, "EDIT_CONFLICT");
+    const invalidEditRange = await apiJson<ApiErrorBody>("notes?path=%2Fnotes%2Fa.md", {
+      method: "PATCH",
+      token: userToken,
+      expectedStatus: 400,
+      body: {
+        ifMatch: deletedLines.data.note.fileVersion,
+        fromLine: 3,
+        toLine: 3,
+        content: "outside"
+      }
+    });
+    assertErrorCode(invalidEditRange, "VALIDATION_ERROR");
+    const invalidEditOrder = await apiJson<ApiErrorBody>("notes?path=%2Fnotes%2Fa.md", {
+      method: "PATCH",
+      token: userToken,
+      expectedStatus: 400,
+      body: {
+        ifMatch: deletedLines.data.note.fileVersion,
+        fromLine: 2,
+        toLine: 1,
+        content: "invalid"
+      }
+    });
+    assertErrorCode(invalidEditOrder, "VALIDATION_ERROR");
+    const missingEditLine = await apiJson<ApiErrorBody>("notes?path=%2Fnotes%2Fa.md", {
+      method: "PATCH",
+      token: userToken,
+      expectedStatus: 400,
+      body: {
+        ifMatch: deletedLines.data.note.fileVersion,
+        fromLine: 1,
+        content: "missing"
+      }
+    });
+    assertErrorCode(missingEditLine, "VALIDATION_ERROR");
+    await apiJson("notes?path=%2Fnotes%2Fa.md", {
+      method: "PUT",
+      token: userToken,
+      body: {
+        content: "# A\nAction Item\nclosing\n",
+        ifMatch: deletedLines.data.note.fileVersion
+      }
+    });
     await apiJson("notes", {
       method: "POST",
       token: userToken,
