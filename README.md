@@ -147,10 +147,11 @@ runtime/fulltest-docker/workspaces
 runtime/fulltest-docker/runner
 runtime/fulltest-docker/playwright-report
 runtime/fulltest-docker/test-results
+runtime/fulltest-docker/full-test-runner.log
 runtime/fulltest-docker/compose.log
 ```
 
-失败时会保留 Playwright 报告、测试结果和 Compose 日志，便于排查；该环境不污染 `runtime/dev` 和 `runtime/prod`。
+失败时会保留完整测试 runner 日志、Playwright 报告、测试结果和 Compose 日志，便于排查；该环境不污染 `runtime/dev` 和 `runtime/prod`。
 
 测试 Compose 项目名固定为 `notes-test`，不会复用开发或生产容器。
 
