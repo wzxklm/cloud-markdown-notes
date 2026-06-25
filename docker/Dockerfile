@@ -24,8 +24,12 @@ ENV PATH="/app/node_modules/.bin:${PATH}"
 ENTRYPOINT ["notes-entrypoint"]
 CMD ["npm", "run", "dev"]
 
-FROM development AS build
+FROM base AS build
 
+COPY package*.json ./
+RUN npm install
+
+COPY . .
 RUN npm run build
 
 FROM base AS production
