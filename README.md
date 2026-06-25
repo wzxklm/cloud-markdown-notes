@@ -59,6 +59,12 @@ ADMIN_PASSWORD=change-me
 - `PUBLIC_BASE_URL` 用于生成公开分享链接。
 - `NOTES_API_URL` 是 CLI 默认连接的服务端地址。
 
+应用进程的 dotenv 加载规则：
+
+- `APP_ENV=development` 或未设置 `APP_ENV` 时，默认读取 `.env.dev`，方便本地开发。
+- `APP_ENV=test` 和 `APP_ENV=production` 时，默认不读取 `.env.dev`，只使用 Docker Compose 或宿主环境已经注入的变量。
+- 如需显式指定 dotenv 文件，可设置 `DOTENV_CONFIG_PATH=/path/to/env-file`。
+
 生产环境参考 `.env.prod.example`：
 
 ```bash

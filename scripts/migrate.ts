@@ -1,11 +1,11 @@
-import dotenv from "dotenv";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import pg from "pg";
+import { loadProcessEnv } from "../src/server/env";
 
 const { Pool } = pg;
 
-dotenv.config({ path: process.env.DOTENV_CONFIG_PATH ?? ".env.dev" });
+loadProcessEnv();
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

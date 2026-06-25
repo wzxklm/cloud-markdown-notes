@@ -1,7 +1,7 @@
-import dotenv from "dotenv";
 import path from "node:path";
+import { loadProcessEnv } from "./env";
 
-dotenv.config({ path: process.env.DOTENV_CONFIG_PATH ?? ".env.dev" });
+loadProcessEnv();
 
 export type AppConfig = {
   appEnv: string;
