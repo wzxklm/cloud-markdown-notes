@@ -445,7 +445,7 @@ http://localhost:5173
 1. 使用管理员账号登录。
 2. 普通用户注册后，管理员在 `admin` 页签中加载待激活用户并激活。
 3. 普通用户登录后，在左侧工作区树创建文件夹和笔记。
-4. 中间区域编辑 Markdown，右侧实时预览；保存时使用 `fileVersion` 防止覆盖服务器上的新版本。
+4. 中间区域编辑 Markdown，右侧使用 GFM Markdown 渲染实时预览；保存时使用 `fileVersion` 防止覆盖服务器上的新版本。
 5. `version` 页签查看 status、diff、提交历史、历史提交详情、恢复路径和丢弃未提交变更。
 6. `search` 页签使用 Glob、Grep、Read。
 7. `transfer` 页签导出 zip，或选择 zip 做 dry-run 与正式导入。

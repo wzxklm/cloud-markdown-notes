@@ -21,6 +21,30 @@ test("creates, edits, versions, moves, restores, discards, and deletes notes", a
   await expect(page.getByRole("heading", { name: "Alpha" })).toBeVisible();
   await expect(page.locator(".markdown-preview")).toContainText("Action Item");
   await expect(page.getByText("untracked /docs/a.md")).toBeVisible();
+
+  await createNoteInUi(
+    page,
+    "/docs/fenced.md",
+    [
+      "# Fenced copy block",
+      "",
+      "`````text",
+      "Copy this whole block.",
+      "",
+      "```bash",
+      "notes health --json",
+      "```",
+      "`````",
+      ""
+    ].join("\n")
+  );
+  await expect(page.getByRole("heading", { name: "Fenced copy block" })).toBeVisible();
+  const previewCodeBlocks = page.locator(".markdown-preview pre");
+  await expect(previewCodeBlocks).toHaveCount(1);
+  await expect(previewCodeBlocks.first()).toContainText("```bash");
+  await expect(previewCodeBlocks.first()).toContainText("notes health --json");
+
+  await page.getByRole("button", { name: "a.md" }).click();
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(page.getByRole("heading", { name: "Alpha" })).toBeVisible();
 
