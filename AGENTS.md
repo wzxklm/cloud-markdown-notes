@@ -106,6 +106,7 @@ Validation:
 │   │   ├── app.ts                    # 创建 Fastify 应用、健康检查和路由注册
 │   │   ├── index.ts                  # 后端服务启动入口
 │   │   ├── config.ts                 # 读取环境变量并生成配置
+│   │   ├── env.ts                    # 按 APP_ENV 加载 dotenv 配置
 │   │   ├── db.ts                     # PostgreSQL 连接池
 │   │   ├── auth.ts                   # 注册、登录、会话、退出和管理员激活
 │   │   ├── content.ts                # 文件夹和 Markdown 笔记 CRUD
