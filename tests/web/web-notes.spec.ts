@@ -44,6 +44,21 @@ test("creates, edits, versions, moves, restores, discards, and deletes notes", a
   await expect(previewCodeBlocks.first()).toContainText("```bash");
   await expect(previewCodeBlocks.first()).toContainText("notes health --json");
 
+  await page
+    .getByLabel("Markdown editor")
+    .fill(
+      ["# Long code line", "", "```text", "long-code-line-" + "x".repeat(240), "```", ""].join("\n")
+    );
+  const longCodeBlock = page.locator(".markdown-preview pre").first();
+  await expect(longCodeBlock).toContainText("long-code-line-");
+  const codeBlockLayout = await longCodeBlock.evaluate((el) => ({
+    clientWidth: el.clientWidth,
+    scrollWidth: el.scrollWidth,
+    whiteSpace: getComputedStyle(el).whiteSpace
+  }));
+  expect(codeBlockLayout.whiteSpace).toBe("pre");
+  expect(codeBlockLayout.scrollWidth).toBeGreaterThan(codeBlockLayout.clientWidth);
+
   await page.getByRole("button", { name: "开发习惯.md" }).click();
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(page.getByRole("heading", { name: "Alpha" })).toBeVisible();

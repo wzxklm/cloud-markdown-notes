@@ -426,6 +426,10 @@ label {
   white-space: pre-wrap;
 }
 
+.markdown-preview pre {
+  white-space: pre;
+}
+
 .tool-panel {
   min-width: 0;
   border-left: 1px solid #d5dcdf;
