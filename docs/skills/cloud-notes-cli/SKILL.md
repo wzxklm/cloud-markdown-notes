@@ -68,7 +68,7 @@ Successful JSON responses are wrapped in `data`; failures are wrapped in `error`
 
 Human-readable output is acceptable for inspection-heavy commands such as `notes help`, `notes diff`, and `notes show <sha>`.
 
-Quote paths, globs, regexes, and Markdown strings that may contain shell metacharacters. Workspace paths start with `/`; notes are Markdown files ending in `.md`.
+Quote paths, globs, and regexes that may contain shell metacharacters. Workspace paths start with `/`; notes are Markdown files ending in `.md`. Note content is read from stdin; use input redirection, a pipe, or a quoted heredoc so the shell does not interpret Markdown.
 
 ## Agent Workflow
 
@@ -89,7 +89,9 @@ Create or inspect content:
 
 ```bash
 notes folder mkdir /docs
-notes note create /docs/a.md --content "# A" --json
+notes note create /docs/a.md --json <<'MARKDOWN'
+# A
+MARKDOWN
 notes note read /docs/a.md --json
 notes tree --json
 ```
@@ -97,8 +99,11 @@ notes tree --json
 Edit content:
 
 ```bash
-notes note replace /docs/a.md --content "# Updated" --json
-notes note edit /docs/a.md --from-line 10 --to-line 12 --content "Replacement" --json
+notes note replace /docs/a.md --json < updated.md
+notes note edit /docs/a.md --from-line 10 --to-line 12 --json <<'MARKDOWN'
+Replacement
+MARKDOWN
+notes note edit /docs/a.md --from-line 10 --to-line 12 --json < /dev/null
 notes note mv /docs/a.md /docs/b.md --json
 notes note rm /docs/b.md --json
 ```

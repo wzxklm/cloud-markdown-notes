@@ -405,13 +405,16 @@ notes folder mv /docs /archive/docs
 notes folder rm /archive/docs
 notes tree
 
-notes note create /docs/a.md --content "# A"
-notes note create /docs/b.md --file local.md
+notes note create /docs/a.md <<'MARKDOWN'
+# A
+MARKDOWN
+notes note create /docs/b.md < local.md
 notes note read /docs/a.md
-notes note replace /docs/a.md --content "# B"
-notes note replace /docs/a.md --file local.md
-notes note edit /docs/a.md --from-line 10 --to-line 12 --content "替换内容"
-notes note edit /docs/a.md --from-line 10 --to-line 12 --content ""
+notes note replace /docs/a.md < local.md
+notes note edit /docs/a.md --from-line 10 --to-line 12 <<'MARKDOWN'
+替换内容
+MARKDOWN
+notes note edit /docs/a.md --from-line 10 --to-line 12 < /dev/null
 notes note mv /docs/a.md /docs/c.md
 notes note rm /docs/c.md
 
@@ -429,7 +432,9 @@ notes search read /docs/a.md --offset 1 --limit 20
 
 notes search grep "目标内容" --json
 notes search read /docs/a.md --offset 20 --limit 20 --json
-notes note edit /docs/a.md --from-line 27 --to-line 31 --content "新内容"
+notes note edit /docs/a.md --from-line 27 --to-line 31 <<'MARKDOWN'
+新内容
+MARKDOWN
 
 notes export -o notes.zip
 notes import notes.zip --dry-run
@@ -439,6 +444,8 @@ notes share publish /docs/a.md
 notes share list
 notes share unpublish <share-id>
 ```
+
+`note create`、`note replace` 和 `note edit` 的 Markdown 正文只从标准输入读取。可以使用 `< local.md`、管道或带引号的 heredoc（`<<'MARKDOWN'`）传入内容，正文不会进入命令行参数，也不会被 shell 展开。空的标准输入表示空正文；用于 `note edit` 时会删除指定行范围。
 
 版本管理命令返回的状态和 patch diff 会保留非 ASCII 路径的原始文件名。
 

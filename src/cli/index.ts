@@ -23,6 +23,7 @@ type CliOptions = {
 };
 
 type CliIo = {
+  stdin: () => Promise<string>;
   stdout: (message: string) => void;
   stderr: (message: string) => void;
   env?: NodeJS.ProcessEnv;
@@ -111,9 +112,19 @@ const shortFlagAliases: Record<string, string> = {
 };
 
 const defaultIo: CliIo = {
+  stdin: readStdin,
   stdout: (message) => console.log(message),
   stderr: (message) => console.error(message)
 };
+
+async function readStdin(): Promise<string> {
+  process.stdin.setEncoding("utf8");
+  let content = "";
+  for await (const chunk of process.stdin) {
+    content += chunk;
+  }
+  return content;
+}
 
 class CliHttpError extends Error {
   constructor(
@@ -293,10 +304,10 @@ function printHelp(io: CliIo): void {
   notes folder mv <from> <to>
   notes folder rm <path>
   notes tree
-  notes note create <path> [--file local.md] [--content text]
+  notes note create <path> < content.md
   notes note read <path>
-  notes note replace <path> [--file local.md] [--content text]
-  notes note edit <path> --from-line n --to-line n --content text
+  notes note replace <path> < content.md
+  notes note edit <path> --from-line n --to-line n < replacement.md
   notes note mv <from> <to>
   notes note rm <path>
   notes status
@@ -318,7 +329,9 @@ function printHelp(io: CliIo): void {
 Global options:
   --json
   --api-url <url>
-  --token <token>`);
+  --token <token>
+
+Markdown content for note create, replace, and edit is read from stdin.`);
 }
 
 async function apiRequest<T>(
@@ -414,7 +427,11 @@ function isApiError(value: unknown): value is ApiError {
   );
 }
 
-async function executeCommand(command: string[], options: CliOptions): Promise<CommandResult> {
+async function executeCommand(
+  command: string[],
+  options: CliOptions,
+  readStdin: () => Promise<string>
+): Promise<CommandResult> {
   const [scope, action, ...rest] = command;
   if (!scope || scope === "help" || scope === "--help" || scope === "-h") {
     return {
@@ -464,7 +481,7 @@ async function executeCommand(command: string[], options: CliOptions): Promise<C
   }
 
   if (scope === "note") {
-    return handleNoteCommand(action, rest, options);
+    return handleNoteCommand(action, rest, options, readStdin);
   }
 
   if (scope === "status") {
@@ -852,14 +869,16 @@ async function handleFolderCommand(
 async function handleNoteCommand(
   action: string | undefined,
   rest: string[],
-  options: CliOptions
+  options: CliOptions,
+  readStdin: () => Promise<string>
 ): Promise<CommandResult> {
   const parsed = parseCommandArgs(rest);
 
   if (action === "create") {
     const notePath = parsed.positionals[0];
     requireString(notePath, "Note path is required.");
-    const content = await readContentFromArgs(parsed, "");
+    assertAllowedFlags(parsed, []);
+    const content = await readStdin();
     const result = await apiRequest<ApiSuccess<{ note: Note }>>(options, "/api/notes", {
       method: "POST",
       body: { path: notePath, content }
@@ -885,7 +904,8 @@ async function handleNoteCommand(
   if (action === "replace") {
     const notePath = parsed.positionals[0];
     requireString(notePath, "Note path is required.");
-    const content = await readContentFromArgs(parsed);
+    assertAllowedFlags(parsed, ["if-match"]);
+    const content = await readStdin();
     const ifMatch =
       stringFlag(parsed, "if-match") ??
       (
@@ -911,10 +931,8 @@ async function handleNoteCommand(
     if (stringFlag(parsed, "line") !== undefined) {
       throw new Error("--line is not supported for note edit. Use --from-line and --to-line.");
     }
-    if (stringFlag(parsed, "file") !== undefined) {
-      throw new Error("--file is not supported for note edit. Use --content.");
-    }
-    const content = readInlineContentFromArgs(parsed);
+    assertAllowedFlags(parsed, ["from-line", "to-line", "if-match"]);
+    const content = await readStdin();
     const fromLine = requiredNumberFlag(parsed, "from-line");
     const toLine = requiredNumberFlag(parsed, "to-line");
     const ifMatch =
@@ -1142,34 +1160,12 @@ async function handleShareCommand(
   throw new Error(`Unknown command: share ${action ?? ""}`.trim());
 }
 
-async function readContentFromArgs(
-  parsed: ParsedCommandArgs,
-  defaultContent?: string
-): Promise<string> {
-  const filePath = stringFlag(parsed, "file");
-  if (filePath) {
-    return readFile(filePath, "utf8");
+function assertAllowedFlags(parsed: ParsedCommandArgs, allowedFlags: string[]): void {
+  for (const flag of Object.keys(parsed.flags)) {
+    if (!allowedFlags.includes(flag)) {
+      throw new Error(`Unknown option: --${flag}`);
+    }
   }
-
-  const content = stringFlag(parsed, "content");
-  if (content !== undefined) {
-    return content;
-  }
-
-  if (defaultContent !== undefined) {
-    return defaultContent;
-  }
-
-  throw new Error("--file or --content is required.");
-}
-
-function readInlineContentFromArgs(parsed: ParsedCommandArgs): string {
-  const content = stringFlag(parsed, "content");
-  if (content === undefined) {
-    throw new Error("--content is required.");
-  }
-
-  return content;
 }
 
 function formatTree(root: TreeNode): string[] {
@@ -1303,7 +1299,7 @@ export async function runCli(args: string[], io: CliIo = defaultIo): Promise<voi
     return;
   }
 
-  const result = await executeCommand(command, options);
+  const result = await executeCommand(command, options, io.stdin);
   printResult(result, options, io);
 }
 

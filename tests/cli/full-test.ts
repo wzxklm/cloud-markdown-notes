@@ -73,6 +73,7 @@ async function runNotes(
     configPath?: string;
     env?: NodeJS.ProcessEnv;
     expectFailure?: boolean;
+    input?: string;
   } = {}
 ): Promise<CommandResult> {
   if (!notesCommand) {
@@ -81,17 +82,7 @@ async function runNotes(
 
   const commandArgs = args;
   try {
-    const { stdout, stderr } = await execFileAsync(notesCommand, commandArgs, {
-      cwd: commandWorkRoot,
-      env: {
-        ...process.env,
-        NOTES_API_URL: apiUrl,
-        NOTES_CONFIG_PATH: options.configPath ?? userConfigPath,
-        ...options.env
-      },
-      maxBuffer: 20 * 1024 * 1024,
-      timeout: 120_000
-    });
+    const { stdout, stderr } = await execNotes(commandArgs, options);
     if (options.expectFailure) {
       throw new Error(
         `Command succeeded but failure was expected.\n${formatCommand(notesCommand, commandArgs)}\n${stdout}`
@@ -123,6 +114,7 @@ async function runJson<T>(
   args: string[],
   options: {
     configPath?: string;
+    input?: string;
   } = {}
 ): Promise<T> {
   const result = await runNotes([...args, "--json"], options);
@@ -131,6 +123,38 @@ async function runJson<T>(
   } catch {
     throw new Error(`Command did not return valid JSON: notes ${args.join(" ")}\n${result.stdout}`);
   }
+}
+
+function execNotes(
+  args: string[],
+  options: { configPath?: string; env?: NodeJS.ProcessEnv; input?: string }
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      notesCommand,
+      args,
+      {
+        cwd: commandWorkRoot,
+        env: {
+          ...process.env,
+          NOTES_API_URL: apiUrl,
+          NOTES_CONFIG_PATH: options.configPath ?? userConfigPath,
+          ...options.env
+        },
+        maxBuffer: 20 * 1024 * 1024,
+        timeout: 120_000
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          Object.assign(error, { stdout, stderr });
+          reject(error);
+          return;
+        }
+        resolve({ stdout, stderr });
+      }
+    );
+    child.stdin?.end(options.input ?? "");
+  });
 }
 
 function formatCommand(command: string, args: string[]): string {
@@ -406,26 +430,25 @@ async function main(): Promise<void> {
       { configPath: userConfigPath }
     );
     assertEqual(movedFolder.data.folder.path, "/notes/archive", "Moved folder path");
+    const markdownContent =
+      '# Intro\n\nAction Item with `$HOME`, `$(command)`, \'single\' and "double" quotes.\n\n```bash\necho \\"$HOME\\"\n```\nclosing\n';
     const created = await runJson<{ data: { note: { path: string; content: string } } }>(
-      ["note", "create", "/notes/a.md", "--content", "Intro\nAction Item\nclosing\n"],
-      { configPath: userConfigPath }
+      ["note", "create", "/notes/a.md"],
+      { configPath: userConfigPath, input: markdownContent }
     );
     assertEqual(created.data.note.path, "/notes/a.md", "Created note path");
-    const duplicateNote = await runNotes(
-      ["note", "create", "/notes/a.md", "--content", "duplicate", "--json"],
-      {
-        configPath: userConfigPath,
-        expectFailure: true
-      }
-    );
+    assertEqual(created.data.note.content, markdownContent, "Created note stdin content");
+    const duplicateNote = await runNotes(["note", "create", "/notes/a.md", "--json"], {
+      configPath: userConfigPath,
+      expectFailure: true,
+      input: "duplicate"
+    });
     assert(duplicateNote.stderr.includes("PATH_ALREADY_EXISTS"), "Duplicate note should fail.");
-    const invalidNotePath = await runNotes(
-      ["note", "create", "/notes/plain.txt", "--content", "plain", "--json"],
-      {
-        configPath: userConfigPath,
-        expectFailure: true
-      }
-    );
+    const invalidNotePath = await runNotes(["note", "create", "/notes/plain.txt", "--json"], {
+      configPath: userConfigPath,
+      expectFailure: true,
+      input: "plain"
+    });
     assert(invalidNotePath.stderr.includes("PATH_INVALID"), "Non-Markdown note should fail.");
     const read = await runJson<{ data: { note: { content: string } } }>(
       ["note", "read", "/notes/a.md"],
@@ -433,37 +456,31 @@ async function main(): Promise<void> {
         configPath: userConfigPath
       }
     );
-    assert(read.data.note.content.includes("Action Item"), "Read note should include content.");
-    const replacementPath = path.join(workRoot, "replacement.md");
-    await writeFile(replacementPath, "# A\nAction Item\nclosing\n", "utf8");
+    assertEqual(
+      read.data.note.content,
+      markdownContent,
+      "Read note should preserve stdin content."
+    );
     const replaced = await runJson<{ data: { note: { content: string } } }>(
-      ["note", "replace", "/notes/a.md", "--file", `${commandWorkRoot}/replacement.md`],
-      { configPath: userConfigPath }
+      ["note", "replace", "/notes/a.md"],
+      { configPath: userConfigPath, input: "# A\nAction Item\nclosing\n" }
     );
     assertEqual(replaced.data.note.content, "# A\nAction Item\nclosing\n", "Replaced note content");
-    const grepForEdit = await runJson<{ data: { matches: { path: string; lineNumber: number }[] } }>(
-      ["search", "grep", "Action Item"],
-      { configPath: userConfigPath }
-    );
+    const grepForEdit = await runJson<{
+      data: { matches: { path: string; lineNumber: number }[] };
+    }>(["search", "grep", "Action Item"], { configPath: userConfigPath });
     assertEqual(grepForEdit.data.matches[0]?.lineNumber, 2, "Grep should find editable line");
     const readForEdit = await runJson<{ data: { note: { content: string } } }>(
       ["search", "read", "/notes/a.md", "--offset", "1", "--limit", "3"],
       { configPath: userConfigPath }
     );
-    assert(readForEdit.data.note.content.includes("Action Item"), "Read slice should include target.");
+    assert(
+      readForEdit.data.note.content.includes("Action Item"),
+      "Read slice should include target."
+    );
     const edited = await runJson<{ data: { note: { content: string } } }>(
-      [
-        "note",
-        "edit",
-        "/notes/a.md",
-        "--from-line",
-        "2",
-        "--to-line",
-        "2",
-        "--content",
-        "First action\nSecond action"
-      ],
-      { configPath: userConfigPath }
+      ["note", "edit", "/notes/a.md", "--from-line", "2", "--to-line", "2"],
+      { configPath: userConfigPath, input: "First action\nSecond action" }
     );
     assertEqual(
       edited.data.note.content,
@@ -471,18 +488,8 @@ async function main(): Promise<void> {
       "Edited note content"
     );
     const deletedLines = await runJson<{ data: { note: { content: string } } }>(
-      [
-        "note",
-        "edit",
-        "/notes/a.md",
-        "--from-line",
-        "2",
-        "--to-line",
-        "3",
-        "--content",
-        ""
-      ],
-      { configPath: userConfigPath }
+      ["note", "edit", "/notes/a.md", "--from-line", "2", "--to-line", "3"],
+      { configPath: userConfigPath, input: "" }
     );
     assertEqual(deletedLines.data.note.content, "# A\nclosing\n", "Deleted note line range");
     const staleEdit = await runNotes(
@@ -494,47 +501,43 @@ async function main(): Promise<void> {
         "1",
         "--to-line",
         "1",
-        "--content",
-        "# Stale",
         "--if-match",
         "stale-version",
         "--json"
       ],
       {
         configPath: userConfigPath,
-        expectFailure: true
+        expectFailure: true,
+        input: "# Stale"
       }
     );
     assert(staleEdit.stderr.includes("EDIT_CONFLICT"), "Stale edit should fail.");
-    await runJson(
-      ["note", "replace", "/notes/a.md", "--content", "# A\nAction Item\nclosing\n"],
-      { configPath: userConfigPath }
+    await runJson(["note", "replace", "/notes/a.md"], {
+      configPath: userConfigPath,
+      input: "# A\nAction Item\nclosing\n"
+    });
+    const stdinCreated = await runJson<{ data: { note: { path: string; content: string } } }>(
+      ["note", "create", "/notes/from-stdin.md"],
+      { configPath: userConfigPath, input: "# A\nAction Item\nclosing\n" }
     );
-    const fileCreated = await runJson<{ data: { note: { path: string; content: string } } }>(
-      ["note", "create", "/notes/from-file.md", "--file", `${commandWorkRoot}/replacement.md`],
-      { configPath: userConfigPath }
+    assertEqual(
+      stdinCreated.data.note.content,
+      "# A\nAction Item\nclosing\n",
+      "Stdin note content"
     );
-    assertEqual(fileCreated.data.note.content, "# A\nAction Item\nclosing\n", "File note content");
-    await runJson(["note", "rm", "/notes/from-file.md"], { configPath: userConfigPath });
+    await runJson(["note", "rm", "/notes/from-stdin.md"], { configPath: userConfigPath });
     const staleReplace = await runNotes(
-      [
-        "note",
-        "replace",
-        "/notes/a.md",
-        "--content",
-        "# Stale\n",
-        "--if-match",
-        "stale-version",
-        "--json"
-      ],
+      ["note", "replace", "/notes/a.md", "--if-match", "stale-version", "--json"],
       {
         configPath: userConfigPath,
-        expectFailure: true
+        expectFailure: true,
+        input: "# Stale\n"
       }
     );
     assert(staleReplace.stderr.includes("EDIT_CONFLICT"), "Stale replace should fail.");
-    await runJson(["note", "create", "/notes/temp.md", "--content", "temporary\n"], {
-      configPath: userConfigPath
+    await runJson(["note", "create", "/notes/temp.md"], {
+      configPath: userConfigPath,
+      input: "temporary\n"
     });
     const moved = await runJson<{ data: { note: { path: string } } }>(
       ["note", "mv", "/notes/temp.md", "/notes/moved.md"],
@@ -587,12 +590,10 @@ async function main(): Promise<void> {
       status.data.changes.some((change) => change.path === "/notes/a.md"),
       "Status should include /notes/a.md."
     );
-    await runJson(
-      ["note", "create", "/notes/开发习惯.md", "--content", "# 开发习惯\n"],
-      {
-        configPath: userConfigPath
-      }
-    );
+    await runJson(["note", "create", "/notes/开发习惯.md"], {
+      configPath: userConfigPath,
+      input: "# 开发习惯\n"
+    });
     const unicodeStatus = await runJson<{ data: { changes: { path: string }[] } }>(["status"], {
       configPath: userConfigPath
     });
@@ -664,12 +665,10 @@ async function main(): Promise<void> {
       invalidRestoreSha.stderr.includes("VALIDATION_ERROR"),
       "Invalid restore sha should fail."
     );
-    await runJson(
-      ["note", "replace", "/notes/a.md", "--content", "# Draft\nAction Item\nclosing\n"],
-      {
-        configPath: userConfigPath
-      }
-    );
+    await runJson(["note", "replace", "/notes/a.md"], {
+      configPath: userConfigPath,
+      input: "# Draft\nAction Item\nclosing\n"
+    });
     const draftDiff = await runJson<{ data: { diff: string } }>(["diff"], {
       configPath: userConfigPath
     });
@@ -686,12 +685,10 @@ async function main(): Promise<void> {
       "# A\nAction Item\nclosing\n",
       "Discarded note content"
     );
-    await runJson(
-      ["note", "replace", "/notes/a.md", "--content", "# Second\nAction Item\nclosing\n"],
-      {
-        configPath: userConfigPath
-      }
-    );
+    await runJson(["note", "replace", "/notes/a.md"], {
+      configPath: userConfigPath,
+      input: "# Second\nAction Item\nclosing\n"
+    });
     await runJson(["folder", "rm", "/notes/archive"], { configPath: userConfigPath });
     await runJson(["commit", "-m", "cli full second"], { configPath: userConfigPath });
     const restored = await runJson<{ data: { restored: { path: string; type: string } } }>(
@@ -835,8 +832,9 @@ async function main(): Promise<void> {
   });
 
   await step("share publish list public read unpublish", async () => {
-    await runJson(["note", "create", "/public.md", "--content", "# CLI Public\n"], {
-      configPath: userConfigPath
+    await runJson(["note", "create", "/public.md"], {
+      configPath: userConfigPath,
+      input: "# CLI Public\n"
     });
     const uncommittedPublish = await runNotes(["share", "publish", "/public.md", "--json"], {
       configPath: userConfigPath,
