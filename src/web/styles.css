@@ -166,11 +166,16 @@ label {
 .workspace {
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .sidebar {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
   border-right: 1px solid #d5dcdf;
   background: #ffffff;
   padding: 18px 14px;
@@ -205,9 +210,11 @@ label {
 
 .tree {
   display: grid;
+  flex: 1;
+  align-content: start;
   gap: 2px;
+  min-height: 0;
   overflow: auto;
-  max-height: calc(100vh - 310px);
 }
 
 .tree-node {
@@ -244,7 +251,10 @@ label {
 }
 
 .content {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
 .toolbar {
@@ -280,12 +290,16 @@ label {
 
 .main-grid {
   display: grid;
+  flex: 1;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
-  min-height: calc(100vh - 56px);
+  min-height: 0;
 }
 
 .editor-area {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
   padding: 18px;
 }
 
@@ -303,13 +317,13 @@ label {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
-  height: calc(100vh - 100px);
-  min-height: 520px;
+  min-height: 0;
 }
 
 .editor-preview textarea,
 .markdown-preview {
   min-width: 0;
+  min-height: 0;
   height: 100%;
   border: 1px solid #d5dcdf;
   border-radius: 8px;
@@ -432,6 +446,8 @@ label {
 
 .tool-panel {
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   border-left: 1px solid #d5dcdf;
   background: #fbfcfc;
   padding: 14px;
@@ -579,17 +595,25 @@ label {
 }
 
 @media (max-width: 1080px) {
+  .workspace {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .main-grid {
     grid-template-columns: 1fr;
   }
 
   .tool-panel {
+    overflow-y: visible;
     border-top: 1px solid #d5dcdf;
     border-left: 0;
   }
 
   .editor-preview {
     height: auto;
+    min-height: 520px;
   }
 }
 

@@ -1,6 +1,33 @@
 import { expect, test } from "@playwright/test";
 import { commitInUi, createActiveUser, createNoteInUi, loginViaUi } from "./helpers";
 
+test("keeps desktop workspace columns within the viewport with independent scrolling", async ({
+  page,
+  request
+}) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  const { username, password } = await createActiveUser(request, "web-layout");
+  await loginViaUi(page, username, password);
+
+  const layout = await page.evaluate(() => {
+    const workspace = document.querySelector<HTMLElement>(".workspace")!;
+    const tree = document.querySelector<HTMLElement>(".tree")!;
+    const editor = document.querySelector<HTMLElement>("[aria-label='Markdown editor']")!;
+    const preview = document.querySelector<HTMLElement>(".markdown-preview")!;
+    const tools = document.querySelector<HTMLElement>(".tool-panel")!;
+    return {
+      documentHeight: document.documentElement.scrollHeight,
+      viewportHeight: window.innerHeight,
+      workspaceHeight: workspace.getBoundingClientRect().height,
+      overflow: [tree, editor, preview, tools].map((element) => getComputedStyle(element).overflowY)
+    };
+  });
+
+  expect(layout.documentHeight).toBe(layout.viewportHeight);
+  expect(layout.workspaceHeight).toBe(layout.viewportHeight);
+  expect(layout.overflow).toEqual(["auto", "auto", "auto", "auto"]);
+});
+
 test("creates, edits, versions, moves, restores, discards, and deletes notes", async ({
   page,
   request
