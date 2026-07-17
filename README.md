@@ -196,6 +196,8 @@ docker compose --env-file .env.prod up -d
 
 Compose 会拉取 `NOTES_IMAGE` 指定的应用镜像和 PostgreSQL 镜像，等待数据库健康后运行迁移并启动 API 与 Web 服务。默认数据保存在部署目录的 `runtime/prod` 中。
 
+应用和数据库容器使用 `restart: always`，进程退出、Docker daemon 重启或宿主机重启后会自动恢复运行。
+
 需要在仓库内从当前源码构建生产镜像时，可执行：
 
 ```bash
