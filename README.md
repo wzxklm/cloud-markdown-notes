@@ -176,23 +176,31 @@ rm -rf runtime/fulltest-docker
 
 ## 部署
 
-生产部署默认从 Docker Hub 拉取预先构建的生产镜像，避免在服务器上安装依赖和构建前端。`docker/compose.prod.yml` 仍作为 `docker/compose.yml` 的生产覆盖配置使用：
+生产部署只需要 Docker Compose 配置和环境变量文件，不需要克隆源码、安装 Node.js 依赖或在服务器上构建前端。
+
+在服务器上创建部署目录并下载两个文件：
 
 ```bash
-cp .env.prod.example .env.prod
+mkdir -p cloud-markdown-notes
+cd cloud-markdown-notes
+curl -fsSL https://raw.githubusercontent.com/wzxklm/cloud-markdown-notes/main/docker/compose.prod.yml -o compose.yml
+curl -fsSL https://raw.githubusercontent.com/wzxklm/cloud-markdown-notes/main/.env.prod.example -o .env.prod
 ```
 
-编辑 `.env.prod` 后拉取镜像并启动：
+编辑 `.env.prod`，至少修改 `POSTGRES_PASSWORD`、`SESSION_SECRET`、`ADMIN_PASSWORD` 和 `PUBLIC_BASE_URL`。然后拉取镜像并启动：
 
 ```bash
-docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml pull app db
-docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml up -d --no-build app db
+docker compose --env-file .env.prod pull
+docker compose --env-file .env.prod up -d
 ```
 
-需要在本机从当前源码构建生产镜像时，仍可执行：
+Compose 会拉取 `NOTES_IMAGE` 指定的应用镜像和 PostgreSQL 镜像，等待数据库健康后运行迁移并启动 API 与 Web 服务。默认数据保存在部署目录的 `runtime/prod` 中。
+
+需要在仓库内从当前源码构建生产镜像时，可执行：
 
 ```bash
-docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml up -d --build app db
+docker build --target production -t cloud-markdown-notes:local -f docker/Dockerfile .
+NOTES_IMAGE=cloud-markdown-notes:local docker compose --env-file .env.prod --project-directory . -f docker/compose.prod.yml up -d
 ```
 
 生产容器启动时会先运行迁移，再同时启动：
@@ -205,33 +213,34 @@ docker compose --env-file .env.prod --project-directory . -f docker/compose.yml 
 查看日志：
 
 ```bash
-docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml logs -f app
+docker compose --env-file .env.prod logs -f app
 ```
 
 停止：
 
 ```bash
-docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml down
+docker compose --env-file .env.prod down
 ```
 
 生产 Compose 项目名固定为 `notes-prod`，不会被开发或测试环境的 `down` 清理。
 
 ### 更新生产容器
 
-生产代码已经合并到当前分支后，在仓库根目录执行：
+在部署目录执行：
 
 ```bash
-git pull
-docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml pull app
-docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml up -d --no-build app db
+docker compose --env-file .env.prod pull app
+docker compose --env-file .env.prod up -d app db
 ```
 
 更新后检查容器和 API 健康状态：
 
 ```bash
-docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml ps
-curl -fsS http://127.0.0.1:${PROD_HOST_API_PORT:-8080}/api/health
+docker compose --env-file .env.prod ps
+curl -fsS http://127.0.0.1:8080/api/health
 ```
+
+如果修改了 `PROD_HOST_API_PORT`，健康检查命令中的 `8080` 也应替换为对应端口。
 
 ### 发布 Docker Hub 镜像
 

@@ -3,10 +3,6 @@ name: notes-prod
 services:
   app:
     image: ${NOTES_IMAGE:-miketop/cloud-markdown-notes:latest}
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      target: production
     environment:
       APP_ENV: production
       API_PORT: 3000
@@ -18,20 +14,36 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-replace-me}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-replace-me}
-    command:
-      ["sh", "-c", "node dist-node/scripts/migrate.js && node dist-node/scripts/start-prod.js"]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:3000/api/health'').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"'
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
     restart: unless-stopped
-    ports: !override
+    ports:
       - "127.0.0.1:${PROD_HOST_API_PORT:-8080}:3000"
       - "127.0.0.1:${PROD_HOST_WEB_PORT:-5173}:5173"
-    volumes: !override
+    volumes:
       - ${PROD_HOST_DATA_ROOT:-./runtime/prod}/workspaces:/data/workspaces
 
   db:
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-notes}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace-me}
       POSTGRES_DB: ${POSTGRES_DB:-notes}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notes} -d ${POSTGRES_DB:-notes}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
-    volumes: !override
+    volumes:
       - ${PROD_HOST_DATA_ROOT:-./runtime/prod}/postgres:/var/lib/postgresql/data

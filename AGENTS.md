@@ -85,7 +85,7 @@ Validation:
 │   ├── Dockerfile                    # development/build/production 多阶段镜像
 │   ├── compose.yml                   # 开发环境 Docker Compose
 │   ├── compose.test.yml              # 测试环境 Compose 覆盖配置
-│   ├── compose.prod.yml              # 生产环境 Compose 覆盖配置
+│   ├── compose.prod.yml              # 可独立拉取镜像运行的生产环境 Compose
 │   ├── entrypoint.sh                 # 容器启动前安装依赖并准备 workspace
 │   └── notes.sh                      # 容器内 notes CLI 包装脚本
 ├── docs/
