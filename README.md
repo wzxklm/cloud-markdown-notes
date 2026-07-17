@@ -255,11 +255,11 @@ GitHub Actions 工作流 `.github/workflows/docker-publish.yml` 会构建 Docker
 
 发布规则：
 
-- 推送到 `main` 且生产镜像输入发生变化：发布 `latest` 和 `sha-<短提交号>`。镜像输入包括服务端、Web、共享代码、生产脚本、依赖文件、构建配置和 Dockerfile；只修改文档、测试或 Compose 不会触发构建。
-- 推送 `v0.3.1` 这类 Git 标签：发布 `0.3.1`、`0.3`、`latest` 和提交号标签。
-- 在 GitHub Actions 页面手动运行：发布所选分支对应的 `latest`（仅默认分支）和提交号标签。
+- 推送到 `main` 且生产镜像输入发生变化：更新 `latest`。镜像输入包括服务端、Web、共享代码、生产脚本、依赖文件、构建配置和 Dockerfile；只修改文档、测试或 Compose 不会触发构建。
+- 推送 `v0.3.1` 这类 Git 标签：发布 `0.3.1` 版本标签，不更新 `latest`。
+- 在 GitHub Actions 页面从默认分支手动运行：更新 `latest`。
 
-生产环境建议把 `NOTES_IMAGE` 固定为明确的版本标签；需要快速跟随主分支时再使用 `latest`。
+生产环境使用 `miketop/cloud-markdown-notes:latest`，更新前执行 `docker compose pull app` 获取最新镜像。
 
 ## API 使用
 
