@@ -6,6 +6,21 @@ on:
       - main
     tags:
       - "v*"
+    paths:
+      - ".dockerignore"
+      - "docker/Dockerfile"
+      - "docker/entrypoint.sh"
+      - "docker/notes.sh"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "public/**"
+      - "scripts/**"
+      - "src/server/**"
+      - "src/shared/**"
+      - "src/web/**"
+      - "tsconfig.json"
+      - "vite.config.ts"
   workflow_dispatch:
 
 permissions:
