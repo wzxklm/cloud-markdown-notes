@@ -86,6 +86,12 @@ PROD_HOST_WEB_PORT=5173
 PROD_HOST_DATA_ROOT=./runtime/prod
 ```
 
+默认应用镜像是 `miketop/cloud-markdown-notes:latest`。如需固定版本或使用其他 Docker Hub 仓库，在 `.env.prod` 中修改：
+
+```text
+NOTES_IMAGE=miketop/cloud-markdown-notes:0.3.1
+```
+
 ## 开发运行
 
 启动 Docker 开发服务：
@@ -170,13 +176,20 @@ rm -rf runtime/fulltest-docker
 
 ## 部署
 
-生产部署使用 `docker/compose.prod.yml` 覆盖开发 Compose：
+生产部署默认从 Docker Hub 拉取预先构建的生产镜像，避免在服务器上安装依赖和构建前端。`docker/compose.prod.yml` 仍作为 `docker/compose.yml` 的生产覆盖配置使用：
 
 ```bash
 cp .env.prod.example .env.prod
 ```
 
-编辑 `.env.prod` 后启动：
+编辑 `.env.prod` 后拉取镜像并启动：
+
+```bash
+docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml pull app db
+docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml up -d --no-build app db
+```
+
+需要在本机从当前源码构建生产镜像时，仍可执行：
 
 ```bash
 docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml up -d --build app db
@@ -209,7 +222,8 @@ docker compose --env-file .env.prod --project-directory . -f docker/compose.yml 
 
 ```bash
 git pull
-docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml up -d --build app db
+docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml pull app
+docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml up -d --no-build app db
 ```
 
 更新后检查容器和 API 健康状态：
@@ -218,6 +232,25 @@ docker compose --env-file .env.prod --project-directory . -f docker/compose.yml 
 docker compose --env-file .env.prod --project-directory . -f docker/compose.yml -f docker/compose.prod.yml ps
 curl -fsS http://127.0.0.1:${PROD_HOST_API_PORT:-8080}/api/health
 ```
+
+### 发布 Docker Hub 镜像
+
+GitHub Actions 工作流 `.github/workflows/docker-publish.yml` 会构建 Dockerfile 的 `production` 阶段，并发布 `linux/amd64`、`linux/arm64` 多架构镜像。
+
+首次使用前，在 GitHub 仓库的 Actions secrets 中配置：
+
+- `DOCKERHUB_USERNAME`：Docker Hub 用户名。
+- `DOCKERHUB_TOKEN`：具有目标仓库读写权限的 Docker Hub access token。
+
+镜像默认发布到 `miketop/cloud-markdown-notes`。仓库名不同时，在 GitHub Actions repository variables 中设置 `DOCKERHUB_IMAGE`，值为完整的 `<namespace>/<repository>`。
+
+发布规则：
+
+- 推送到 `main`：发布 `latest` 和 `sha-<短提交号>`。
+- 推送 `v0.3.1` 这类 Git 标签：发布 `0.3.1`、`0.3`、`latest` 和提交号标签。
+- 在 GitHub Actions 页面手动运行：发布所选分支对应的 `latest`（仅默认分支）和提交号标签。
+
+生产环境建议把 `NOTES_IMAGE` 固定为明确的版本标签；需要快速跟随主分支时再使用 `latest`。
 
 ## API 使用
 

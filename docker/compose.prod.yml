@@ -2,6 +2,7 @@ name: notes-prod
 
 services:
   app:
+    image: ${NOTES_IMAGE:-miketop/cloud-markdown-notes:latest}
     build:
       context: .
       dockerfile: docker/Dockerfile
