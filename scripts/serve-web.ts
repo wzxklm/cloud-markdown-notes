@@ -37,7 +37,7 @@ const server = createServer((req, res) => {
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-  if (requestUrl.pathname.startsWith("/api/")) {
+  if (requestUrl.pathname.startsWith("/api/") || requestUrl.pathname === "/mcp") {
     proxyToApi(req, res, requestUrl);
     return;
   }

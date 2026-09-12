@@ -9,6 +9,7 @@ import { registerContentRoutes } from "./content";
 import { getDatabase, type Database } from "./db";
 import { registerExtensionRoutes } from "./extensions";
 import { registerVersionRoutes } from "./version";
+import { registerMcpRoutes } from "./mcp";
 import { assertWorkspaceWritable, WorkspaceError } from "./workspace";
 
 export type AppDependencies = {
@@ -58,6 +59,7 @@ export function buildApp(config: AppConfig, dependencies: AppDependencies = {}) 
   registerContentRoutes(app, config, db);
   registerVersionRoutes(app, config, db);
   registerExtensionRoutes(app, config, db);
+  registerMcpRoutes(app, config, db);
 
   return app;
 }

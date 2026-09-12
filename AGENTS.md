@@ -25,7 +25,7 @@
 - CLI 测试入口是 `tests/cli/full-test.ts`；该流程会先对 `packages/cli` 执行真实 `npm pack`，再安装包并使用安装后的 `notes` 命令测试。
 - Web 测试入口是 `tests/web/*.spec.ts`，公共辅助函数位于 `tests/web/helpers.ts`。
 - 测试运行时数据放在 `runtime/fulltest-docker`，不会污染 `runtime/dev` 和 `runtime/prod`。
-- 新增、删除或修改可测试功能时，应先更新 `docs/可测试功能.md`；API、CLI、Web 全功能测试脚本应以该文件作为覆盖清单同步维护。
+- 新增、删除或修改可测试功能时，应先更新 `docs/可测试功能.md`；API、CLI、Web、MCP 全功能测试脚本应以该文件作为覆盖清单同步维护。
 - 新增、删除或修改用户可见功能、命令、接口、部署流程或测试流程时，应同步更新 `README.md` 中对应的使用说明、API/CLI 命令清单和 Web 流程说明。
 - 新增、删除或修改 CLI 能力时，应同步更新 `packages/cli/README.md` 和 `docs/skills/cloud-notes-cli/SKILL.md`；如果该能力也影响本机已安装的 Codex skill，应同步更新 `/root/.codex/skills/cloud-notes-cli/SKILL.md`。
 - 只有当需求涉及真实 Web UI 体验、视觉状态、复杂交互手感或自动化测试无法覆盖的问题时，才使用浏览器 MCP 进行 AI 手动实测。
@@ -89,7 +89,7 @@ Validation:
 │   ├── entrypoint.sh                 # 容器启动前安装依赖并准备 workspace
 │   └── notes.sh                      # 容器内 notes CLI 包装脚本
 ├── docs/
-│   └── 可测试功能.md                  # API、CLI、Web 全功能测试覆盖清单
+│   └── 可测试功能.md                  # API、CLI、Web、MCP 全功能测试覆盖清单
 ├── packages/
 │   └── cli/
 │       ├── package.json              # 发布包 cloud-markdown-notes 的 manifest
@@ -105,6 +105,7 @@ Validation:
 │   ├── server/
 │   │   ├── app.ts                    # 创建 Fastify 应用、健康检查和路由注册
 │   │   ├── index.ts                  # 后端服务启动入口
+│   │   ├── mcp.ts                    # Streamable HTTP MCP 路由和工具适配
 │   │   ├── config.ts                 # 读取环境变量并生成配置
 │   │   ├── env.ts                    # 按 APP_ENV 加载 dotenv 配置
 │   │   ├── db.ts                     # PostgreSQL 连接池

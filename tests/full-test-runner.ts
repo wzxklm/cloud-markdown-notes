@@ -26,6 +26,10 @@ const commands: Command[] = [
     args: ["tsx", "tests/cli/full-test.ts"]
   },
   {
+    name: "mcp full test",
+    args: ["tsx", "tests/mcp/full-test.ts"]
+  },
+  {
     name: "web full test",
     args: ["playwright", "test"]
   }

@@ -8,7 +8,7 @@ import type { Database } from "./db";
 import { ensureUserGitWorkspace } from "./workspace";
 
 const scryptAsync = promisify(scrypt);
-const sessionTtlMs = 30 * 24 * 60 * 60 * 1000;
+const sessionTtlMs = 180 * 24 * 60 * 60 * 1000;
 
 export type UserRole = "admin" | "user";
 type UserStatus = "active" | "pending";

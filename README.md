@@ -1,6 +1,6 @@
 # Cloud Markdown Notes
 
-云端 Markdown 笔记系统，提供同一套笔记能力的 API、CLI 和 Web UI 三端入口。
+云端 Markdown 笔记系统，提供同一套笔记能力的 API、CLI、Web UI 和 MCP 四种入口。
 
 当前能力：
 
@@ -149,7 +149,7 @@ sh tests/run-e2e.sh
 
 测试会走真实 HTTP、真实 CLI、真实浏览器、真实 PostgreSQL 和真实 workspace。测试开始前会清空测试数据库和测试 workspace，结束后也会清理测试数据。
 
-全功能测试覆盖清单维护在 `docs/可测试功能.md`。新增或修改功能后，先更新该清单，再同步更新 API、CLI、Web 测试脚本。
+全功能测试覆盖清单维护在 `docs/可测试功能.md`。新增或修改功能后，先更新该清单，再同步更新 API、CLI、Web 和 MCP 测试脚本。
 
 测试环境使用独立运行时目录：
 
@@ -558,3 +558,26 @@ http://localhost:5173
 ```
 
 分享只展示发布时 commit 中的内容，未提交草稿不会公开。
+
+## MCP 使用
+
+服务启动后提供 Streamable HTTP MCP 端点：`POST /mcp`。客户端请求必须携带现有 API 会话 token：`Authorization: Bearer <token>`。支持工作区、Markdown 笔记、搜索、版本、导入和分享工具。先在 CLI 中登录获取 token：
+
+```bash
+notes auth login alice alice-password
+export NOTES_TOKEN="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.HOME+"/.config/cloud-markdown-notes/config.json")).token)')"
+```
+
+Codex 配置（Codex CLI）:
+
+```bash
+codex mcp add cloud-notes --url https://notes.example.com/mcp --bearer-token-env-var NOTES_TOKEN
+```
+
+Claude Code 配置：
+
+```bash
+claude mcp add --transport http cloud-notes https://notes.example.com/mcp --header "Authorization: Bearer $NOTES_TOKEN"
+```
+
+本地生产服务将 URL 替换为 `http://localhost:8080/mcp`。配置完成后，在对应客户端中调用 `tools/list` 或直接让模型读取、编辑和搜索笔记。
