@@ -407,6 +407,28 @@ notes auth login alice alice-password
 notes health
 ```
 
+### Codex skill 配套使用
+
+仓库同时提供了 `cloud-notes-cli` skill，文件位于
+`docs/skills/cloud-notes-cli/SKILL.md`。将该目录安装到 Codex 的个人
+skills 目录后，Codex 就可以按照 skill 中的流程安装、配置并调用
+`notes` CLI：
+
+```bash
+mkdir -p ~/.codex/skills
+cp -R docs/skills/cloud-notes-cli ~/.codex/skills/
+```
+
+重新启动 Codex 后，可以直接让它执行 Cloud Markdown Notes 的 CLI
+操作。该 skill 会指导 Codex 运行 `npm install -g cloud-markdown-notes@latest`
+并使用 `notes ...` 命令；它本身不包含 CLI 程序，因此主机仍需安装
+Node.js 18+ 和 npm。没有 Node.js/npm 时，请改为在开发容器中运行：
+
+```bash
+docker compose --env-file .env.dev --project-directory . \
+  -f docker/compose.yml exec app notes health
+```
+
 也可以单次通过 `--api-url` 指定服务端地址：
 
 ```bash
