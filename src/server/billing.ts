@@ -20,7 +20,7 @@ type BillingRow = {
   stripe_subscription_id: string | null; subscription_status: string | null;
   current_period_end: Date | null; grace_period_end: Date | null;
   checkout_session_id: string | null; manual_access: boolean;
-  subscription_cancel_at_period_end: boolean; subscription_canceled_at: Date | null;
+  subscription_cancel_at: Date | null; subscription_cancel_at_period_end: boolean; subscription_canceled_at: Date | null;
 };
 
 export function registerBillingRoutes(app: FastifyInstance, config: AppConfig, db: Database, stripe = createStripe(config)): void {
@@ -35,7 +35,7 @@ export function registerBillingRoutes(app: FastifyInstance, config: AppConfig, d
     return apiSuccess({ user, status: row.subscription_status, currentPeriodEnd: row.current_period_end,
       gracePeriodEnd: row.grace_period_end, active: user.status === "active", manualAccess: row.manual_access,
       hasCustomer: Boolean(row.stripe_customer_id), enabled,
-      cancelAtPeriodEnd: row.subscription_cancel_at_period_end, canceledAt: row.subscription_canceled_at });
+      cancelAt: row.subscription_cancel_at, cancelAtPeriodEnd: row.subscription_cancel_at_period_end, canceledAt: row.subscription_canceled_at });
   });
 
   app.put<{ Body: { email?: unknown } }>("/api/billing/email", { preHandler: [authenticate] }, async (request, reply) => {
@@ -148,8 +148,9 @@ export async function processBillingEvent(db: Database, stripe: Stripe, priceId:
       subscription_status = case when subscription_updated_at <= $2 then $3 else subscription_status end,
       subscription_updated_at = greatest(subscription_updated_at, $2),
       subscription_cancel_at_period_end = case when subscription_updated_at <= $2 then $5 else subscription_cancel_at_period_end end,
-      subscription_canceled_at = case when subscription_updated_at <= $2 then $6 else subscription_canceled_at end
-      where id = $4`, [sub.id, event.created, sub.status, owner.id, sub.cancel_at_period_end, sub.canceled_at ? new Date(sub.canceled_at * 1000) : null]);
+      subscription_canceled_at = case when subscription_updated_at <= $2 then $6 else subscription_canceled_at end,
+      subscription_cancel_at = case when subscription_updated_at <= $2 then $7 else subscription_cancel_at end
+      where id = $4`, [sub.id, event.created, sub.status, owner.id, sub.cancel_at_period_end, sub.canceled_at ? new Date(sub.canceled_at * 1000) : null, sub.cancel_at ? new Date(sub.cancel_at * 1000) : null]);
     if (paidEnd) {
       await client.query(`update users set current_period_end = greatest(current_period_end, $1::timestamptz),
         grace_period_end = null, status = case when manual_access or greatest(current_period_end, $1::timestamptz) > now() then 'active' else 'pending' end,
