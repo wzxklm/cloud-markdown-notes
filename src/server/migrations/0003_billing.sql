@@ -1,0 +1,10 @@
+alter table users add column if not exists email text;
+alter table users add column if not exists stripe_customer_id text;
+alter table users add column if not exists stripe_subscription_id text;
+alter table users add column if not exists subscription_status text;
+alter table users add column if not exists current_period_end timestamptz;
+alter table users add column if not exists grace_period_end timestamptz;
+create unique index if not exists users_email_lower_idx on users (lower(email)) where email is not null;
+create unique index if not exists users_stripe_customer_idx on users (stripe_customer_id) where stripe_customer_id is not null;
+create unique index if not exists users_stripe_subscription_idx on users (stripe_subscription_id) where stripe_subscription_id is not null;
+create table if not exists stripe_events (id text primary key, received_at timestamptz not null default now());

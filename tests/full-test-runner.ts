@@ -18,6 +18,10 @@ const adminUsername = process.env.ADMIN_USERNAME ?? "admin";
 
 const commands: Command[] = [
   {
+    name: "billing status regression test",
+    args: ["tsx", "tests/api/billing-status-test.ts"]
+  },
+  {
     name: "api full test",
     args: ["tsx", "tests/api/full-test.ts"]
   },

@@ -3,6 +3,7 @@ dist
 dist-node
 coverage
 runtime
+**/runtime
 .git
 .codex
 .env.prod

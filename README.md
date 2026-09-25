@@ -603,3 +603,18 @@ claude mcp add --transport http cloud-notes https://notes.example.com/mcp --head
 ```
 
 本地生产服务将 URL 替换为 `http://localhost:8080/mcp`。配置完成后，在对应客户端中调用 `tools/list` 或直接让模型读取、编辑和搜索笔记。
+# Stripe 订阅
+
+首页提供 HKD 10/月订阅。请在 Stripe Dashboard 创建月度 HKD Price，并配置 `STRIPE_SECRET_KEY`、`STRIPE_PRICE_ID` 和 `STRIPE_WEBHOOK_SECRET`。Webhook 地址为 `/api/billing/webhook`。
+
+公开网站页脚提供 `/terms` 服务条款、`/privacy` 隐私政策、`/refunds` 退款政策和 `/contact` 联系方式。产品与账户支持邮箱为 `cowiejulewbfwo@gmail.com`；Stripe/Link 交易支持也可从支付收据进入。取消订阅不会自动退款，具体退款申请按页面列出的 Stripe Managed Payments 规则及适用法律处理。
+
+Stripe 配置步骤：在 Dashboard 开通 Managed Payments，创建激活的 HKD 10 monthly recurring Price，将 Price ID 写入 `STRIPE_PRICE_ID`，并把 `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`invoice.paid`、`invoice.payment_failed`、`customer.subscription.updated` 和 `customer.subscription.deleted` 投递到 webhook 地址。应用使用 blueprint 要求的 `2026-02-25.preview` Checkout API 版本，并校验 Price 必须为 HKD 10/月。匿名用户访问 `/` 查看介绍和定价；`/login`、`/register` 用于认证；注册后从 `/billing` 开始支付。Stripe 的 secret 和 webhook secret 只配置在服务端环境变量，不要提交到仓库。
+
+登录、注册和订阅页也提供法律与联系页脚；注册和订阅操作前的政策链接在新标签页打开，保留当前表单。四个公开页面无需登录，支持直接访问和刷新。
+
+Notes（`notes.bosschat.de`）由独立个人开发者运营，对外使用上述客服邮箱，不列出公司主体信息。退款政策：首次订阅付款后 7 个自然日内可申请全额退款；续费通常不退、取消通常不按未使用天数退款，但重复或错误扣款、付款后未开通和无法解决的重大服务故障可申请全额或相应比例退款。邮件目标回复时限为 3 个工作日，资料齐全后目标审核时限为 5 个工作日；支付方发起退款后通常 5–10 个工作日到账，具体以银行和支付方为准。退款申请不会自动取消续费。适用法律及 Stripe/Link 更有利的退款权利不受限制。退款与隐私请求通过邮件人工处理，这些文案时限不代表系统已实现自动退款或自动删除账户。页面存在不代表已通过支付平台审核。
+
+订阅状态页读取 webhook 确认的已付款期限和取消状态，不通过 Stripe 的账期直接延长访问权限。`npm test` 同时执行 `tests/api/billing-status-test.ts`，覆盖状态查询、已付款期限及到期限制。
+
+从源码部署时，Docker 构建上下文排除各级 `runtime` 目录和 `.env.prod`。更新既有部署前核对容器实际数据挂载；Compose 的 `--project-directory` 会影响相对数据路径，必须沿用原目录或把 `PROD_HOST_DATA_ROOT` 设置为原挂载的绝对路径，避免误切换至空数据库。

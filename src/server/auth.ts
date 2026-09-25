@@ -5,6 +5,7 @@ import { apiSuccess } from "../shared/api";
 import { apiError } from "../shared/errors";
 import type { AppConfig } from "./config";
 import type { Database } from "./db";
+import { expirePaidAccess } from "./access";
 import { ensureUserGitWorkspace } from "./workspace";
 
 const scryptAsync = promisify(scrypt);
@@ -21,6 +22,7 @@ type UserRow = {
   status: UserStatus;
   created_at: Date | string;
   activated_at: Date | string | null;
+  email: string | null;
 };
 
 type PublicUserRow = Omit<UserRow, "password_hash">;
@@ -32,6 +34,7 @@ export type PublicUser = {
   status: UserStatus;
   createdAt: string;
   activatedAt: string | null;
+  email: string | null;
 };
 
 export type AuthenticatedUser = PublicUser & {
@@ -41,9 +44,10 @@ export type AuthenticatedUser = PublicUser & {
 type RegisterBody = {
   username?: unknown;
   password?: unknown;
+  email?: unknown;
 };
 
-type LoginBody = RegisterBody;
+type LoginBody = { username?: unknown; password?: unknown };
 
 type ActivateParams = {
   userId: string;
@@ -66,13 +70,14 @@ function toPublicUser(row: PublicUserRow): PublicUser {
     role: row.role,
     status: row.status,
     createdAt: toIsoString(row.created_at),
-    activatedAt: row.activated_at ? toIsoString(row.activated_at) : null
+    activatedAt: row.activated_at ? toIsoString(row.activated_at) : null,
+    email: row.email
   };
 }
 
 function readCredentials(
   body: RegisterBody | undefined
-): { username: string; password: string } | undefined {
+): { username: string; password: string; email?: string } | undefined {
   if (!body) {
     return undefined;
   }
@@ -83,11 +88,12 @@ function readCredentials(
 
   const username = body.username.trim();
   const password = body.password;
-  if (!username || !password || username.length > 100 || password.length > 200) {
+  const email = typeof body.email === "string" ? body.email.trim() : undefined;
+  if (!username || !password || username.length > 100 || password.length > 200 || (email && (email.length > 320 || !email.includes("@")))) {
     return undefined;
   }
 
-  return { username, password };
+  return { username, password, ...(email ? { email } : {}) };
 }
 
 async function hashPassword(password: string): Promise<string> {
@@ -114,7 +120,7 @@ function hashSessionToken(token: string, sessionSecret: string): string {
 async function findUserByUsername(db: Database, username: string): Promise<UserRow | undefined> {
   const result = await db.query<UserRow>(
     `
-      select id, username, password_hash, role, status, created_at, activated_at
+      select id, username, password_hash, role, status, created_at, activated_at, email
       from users
       where lower(username) = lower($1)
     `,
@@ -130,16 +136,17 @@ async function createUser(
   password: string,
   role: UserRole,
   status: UserStatus,
-  activatedAt: Date | null
+  activatedAt: Date | null,
+  email: string | null = null
 ): Promise<UserRow> {
   const passwordHash = await hashPassword(password);
   const result = await db.query<UserRow>(
     `
-      insert into users (id, username, password_hash, role, status, activated_at)
-      values ($1, $2, $3, $4, $5, $6)
-      returning id, username, password_hash, role, status, created_at, activated_at
+      insert into users (id, username, password_hash, role, status, activated_at, email)
+      values ($1, $2, $3, $4, $5, $6, $7)
+      returning id, username, password_hash, role, status, created_at, activated_at, email
     `,
-    [randomUUID(), username, passwordHash, role, status, activatedAt]
+    [randomUUID(), username, passwordHash, role, status, activatedAt, email]
   );
 
   return result.rows[0];
@@ -159,9 +166,10 @@ async function updateAdminUser(
           password_hash = $2,
           role = 'admin',
           status = 'active',
+          manual_access = true,
           activated_at = coalesce(activated_at, now())
       where id = $3
-      returning id, username, password_hash, role, status, created_at, activated_at
+      returning id, username, password_hash, role, status, created_at, activated_at, email
     `,
     [username, passwordHash, userId]
   );
@@ -195,6 +203,9 @@ async function registerUser(config: AppConfig, db: Database, body: RegisterBody)
     };
   }
 
+  if (body.email !== undefined && (typeof body.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim()))) {
+    return { status: 400, body: apiError("VALIDATION_ERROR", "A valid email is required.") };
+  }
   const existing = await findUserByUsername(db, credentials.username);
   if (existing) {
     return { status: 409, body: apiError("USER_ALREADY_EXISTS", "Username already exists.") };
@@ -206,29 +217,31 @@ async function registerUser(config: AppConfig, db: Database, body: RegisterBody)
     credentials.password,
     "user",
     "pending",
-    null
+    null,
+    credentials.email ?? null
   );
   await ensureUserGitWorkspace(config.workspaceRoot, user.id);
 
   return {
     status: 201,
     body: apiSuccess({
-      user: toPublicUser(user)
+      user: toPublicUser(user),
+      token: await createSession(config, db, user.id, "billing")
     })
   };
 }
 
-async function createSession(config: AppConfig, db: Database, userId: string): Promise<string> {
+async function createSession(config: AppConfig, db: Database, userId: string, scope: "workspace" | "billing" = "workspace"): Promise<string> {
   const token = randomBytes(32).toString("base64url");
   const tokenHash = hashSessionToken(token, config.sessionSecret);
-  const expiresAt = new Date(Date.now() + sessionTtlMs);
+  const expiresAt = new Date(Date.now() + (scope === "billing" ? 24 * 60 * 60 * 1000 : sessionTtlMs));
 
   await db.query(
     `
-      insert into sessions (id, user_id, token_hash, expires_at)
-      values ($1, $2, $3, $4)
+      insert into sessions (id, user_id, token_hash, expires_at, scope)
+      values ($1, $2, $3, $4, $5)
     `,
-    [randomUUID(), userId, tokenHash, expiresAt]
+    [randomUUID(), userId, tokenHash, expiresAt, scope]
   );
 
   return token;
@@ -241,11 +254,13 @@ function publicCurrentUser(user: AuthenticatedUser): PublicUser {
     role: user.role,
     status: user.status,
     createdAt: user.createdAt,
-    activatedAt: user.activatedAt
+    activatedAt: user.activatedAt,
+    email: user.email
   };
 }
 
-async function loginUser(config: AppConfig, db: Database, body: LoginBody) {
+async function loginUser(config: AppConfig, db: Database, body: LoginBody, billing = false) {
+  await expirePaidAccess(db);
   const credentials = readCredentials(body);
   if (!credentials) {
     return {
@@ -259,12 +274,12 @@ async function loginUser(config: AppConfig, db: Database, body: LoginBody) {
     return { status: 401, body: apiError("INVALID_CREDENTIALS", "Invalid username or password.") };
   }
 
-  if (user.status !== "active") {
+  if (!billing && user.status !== "active") {
     return { status: 403, body: apiError("USER_PENDING", "User is pending activation.") };
   }
 
   await ensureUserGitWorkspace(config.workspaceRoot, user.id);
-  const token = await createSession(config, db, user.id);
+  const token = await createSession(config, db, user.id, billing ? "billing" : "workspace");
 
   return {
     status: 200,
@@ -304,6 +319,7 @@ export function requireCurrentUser(
 
 export function makeAuthenticate(config: AppConfig, db: Database) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    await expirePaidAccess(db);
     const token = getBearerToken(request);
     if (!token) {
       void reply.status(401).send(apiError("UNAUTHENTICATED", "Authentication is required."));
@@ -313,11 +329,11 @@ export function makeAuthenticate(config: AppConfig, db: Database) {
     const tokenHash = hashSessionToken(token, config.sessionSecret);
     const result = await db.query<UserRow>(
       `
-        select u.id, u.username, u.password_hash, u.role, u.status, u.created_at, u.activated_at
+        select u.id, u.username, u.password_hash, u.role, u.status, u.created_at, u.activated_at, u.email
         from sessions s
         join users u on u.id = s.user_id
         where s.token_hash = $1
-          and s.expires_at > now()
+          and s.expires_at > now() and s.scope = 'workspace'
       `,
       [tokenHash]
     );
@@ -340,6 +356,19 @@ export function makeAuthenticate(config: AppConfig, db: Database) {
   };
 }
 
+export function makeBillingAuthenticate(config: AppConfig, db: Database) {
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    await expirePaidAccess(db);
+    const token = getBearerToken(request);
+    if (!token) { void reply.status(401).send(apiError("UNAUTHENTICATED", "Authentication is required.")); return; }
+    const tokenHash = hashSessionToken(token, config.sessionSecret);
+    const result = await db.query<UserRow>(`select u.id, u.username, u.password_hash, u.role, u.status, u.created_at, u.activated_at, u.email from sessions s join users u on u.id = s.user_id where s.token_hash = $1 and s.expires_at > now()`, [tokenHash]);
+    const user = result.rows[0];
+    if (!user) { void reply.status(401).send(apiError("UNAUTHENTICATED", "Authentication is required.")); return; }
+    request.currentUser = { ...toPublicUser(user), sessionTokenHash: tokenHash };
+  };
+}
+
 async function requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const user = requireCurrentUser(request, reply);
   if (!user) {
@@ -352,9 +381,10 @@ async function requireAdmin(request: FastifyRequest, reply: FastifyReply): Promi
 }
 
 async function listPendingUsers(db: Database): Promise<PublicUser[]> {
+  await expirePaidAccess(db);
   const result = await db.query<PublicUserRow>(
     `
-      select id, username, role, status, created_at, activated_at
+      select id, username, role, status, created_at, activated_at, email
       from users
       where role = 'user'
         and status = 'pending'
@@ -370,10 +400,11 @@ async function activateUser(config: AppConfig, db: Database, userId: string) {
     `
       update users
       set status = 'active',
+          manual_access = true,
           activated_at = coalesce(activated_at, now())
       where id = $1
         and role = 'user'
-      returning id, username, password_hash, role, status, created_at, activated_at
+      returning id, username, password_hash, role, status, created_at, activated_at, email
     `,
     [userId]
   );
@@ -405,10 +436,20 @@ export function registerAuthRoutes(app: FastifyInstance, config: AppConfig, db: 
     void reply.status(result.status).send(result.body);
   });
 
+  app.post<{ Body: LoginBody }>("/api/billing/login", async (request, reply) => {
+    const result = await loginUser(config, db, request.body, true);
+    return reply.status(result.status).send(result.body);
+  });
+  app.post("/api/billing/workspace-session", { preHandler: [makeBillingAuthenticate(config, db)] }, async (request, reply) => {
+    const user = requireCurrentUser(request, reply);
+    if (!user) return;
+    if (user.status !== "active") return reply.status(403).send(apiError("USER_PENDING", "Payment or administrator activation is required."));
+    return apiSuccess({ token: await createSession(config, db, user.id), user: publicCurrentUser(user) });
+  });
   app.post(
     "/api/auth/logout",
     {
-      preHandler: [authenticate]
+      preHandler: [makeBillingAuthenticate(config, db)]
     },
     async (request, reply) => {
       const user = requireCurrentUser(request, reply);

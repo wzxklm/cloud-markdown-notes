@@ -5,14 +5,14 @@ test("registers a pending user, activates it as admin, and logs in", async ({ pa
   const username = uniqueName("web-auth");
   const password = `${username}-password`;
 
-  await page.goto("/");
+  await page.goto("/login");
   await page.locator(".segmented").getByRole("button", { name: "Register" }).click();
   await page.getByLabel("Username").fill(username);
+  await page.getByLabel("Email").fill(`${username}@example.com`);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Register" }).last().click();
-  await expect(
-    page.getByText(`${username} is waiting for administrator activation.`)
-  ).toBeVisible();
+  await expect(page.getByText("Subscription & access")).toBeVisible();
+  await page.goto("/login");
 
   await page.locator(".segmented").getByRole("button", { name: "Login" }).click();
   await page.getByLabel("Username").fill(username);
@@ -23,9 +23,8 @@ test("registers a pending user, activates it as admin, and logs in", async ({ pa
   await page.getByLabel("Username").fill(username);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Login" }).last().click();
-  await expect(
-    page.getByText("Your account is waiting for administrator activation.")
-  ).toBeVisible();
+  await expect(page.getByText("Subscription & access")).toBeVisible();
+  await page.goto("/login");
 
   await page.getByLabel("Username").fill(adminUsername);
   await page.getByLabel("Password").fill(adminPassword);

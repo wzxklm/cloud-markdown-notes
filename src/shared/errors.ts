@@ -19,6 +19,7 @@ export const errorCodes = [
   "NOTE_NOT_COMMITTED",
   "SHARE_NOT_FOUND",
   "INTERNAL_ERROR"
+  ,"BILLING_NOT_CONFIGURED","CHECKOUT_NOT_READY","PAYMENT_REQUIRED"
 ] as const;
 
 export type ErrorCode = (typeof errorCodes)[number];

@@ -10,10 +10,15 @@ import { getDatabase, type Database } from "./db";
 import { registerExtensionRoutes } from "./extensions";
 import { registerVersionRoutes } from "./version";
 import { registerMcpRoutes } from "./mcp";
+import type Stripe from "stripe";
+import { expirePaidAccess } from "./access";
+import rawBody from "fastify-raw-body";
+import { registerBillingRoutes } from "./billing";
 import { assertWorkspaceWritable, WorkspaceError } from "./workspace";
 
 export type AppDependencies = {
   database?: Database;
+  stripe?: Stripe;
 };
 
 export function buildApp(config: AppConfig, dependencies: AppDependencies = {}) {
@@ -26,12 +31,16 @@ export function buildApp(config: AppConfig, dependencies: AppDependencies = {}) 
     origin: true
   });
 
+
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof WorkspaceError) {
       void reply.status(error.statusCode).send(apiError(error.code, error.message));
       return;
     }
 
+    if (error && typeof error === "object" && "code" in error && error.code === "23505") {
+      return reply.status(409).send(apiError("USER_ALREADY_EXISTS", "That username or email is already registered."));
+    }
     app.log.error(error);
     void reply.status(500).send(apiError("INTERNAL_ERROR", "Internal server error."));
   });
@@ -60,6 +69,17 @@ export function buildApp(config: AppConfig, dependencies: AppDependencies = {}) 
   registerVersionRoutes(app, config, db);
   registerExtensionRoutes(app, config, db);
   registerMcpRoutes(app, config, db);
+  void app.register(async (billingApp) => {
+    await billingApp.register(rawBody, { field: "rawBody", global: false, encoding: "utf8", runFirst: true });
+    registerBillingRoutes(billingApp, config, db, dependencies.stripe);
+  });
+  let expiryTimer: ReturnType<typeof setInterval>;
+  app.addHook("onReady", async () => {
+    await expirePaidAccess(db);
+    expiryTimer = setInterval(() => { void expirePaidAccess(db).catch((error) => app.log.error(error)); }, 60_000);
+    expiryTimer.unref();
+  });
+  app.addHook("onClose", async () => { clearInterval(expiryTimer); });
 
   return app;
 }

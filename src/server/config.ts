@@ -13,6 +13,9 @@ export type AppConfig = {
   sessionSecret: string;
   adminUsername: string;
   adminPassword: string;
+  stripeSecretKey?: string;
+  stripePriceId?: string;
+  stripeWebhookSecret?: string;
 };
 
 function readNumber(name: string, fallback: number): number {
@@ -59,6 +62,9 @@ export function loadConfig(): AppConfig {
     publicBaseUrl: process.env.PUBLIC_BASE_URL || "http://localhost:5173",
     sessionSecret,
     adminUsername,
-    adminPassword
+    adminPassword,
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+    stripePriceId: process.env.STRIPE_PRICE_ID,
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET
   };
 }

@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ApiSuccess } from "../shared/api";
 import type { ApiError, ErrorCode } from "../shared/errors";
+import { LandingPage, BillingPage } from "./PublicPages";
+import { ContactPage, LegalFooter, PolicyNotice, PrivacyPage, RefundsPage, TermsPage } from "./LegalPages";
 import { MarkdownPreview } from "./MarkdownPreview";
 
-type PublicUser = {
+export type PublicUser = {
   id: string;
   username: string;
   role: "admin" | "user";
   status: "active" | "pending";
   createdAt: string;
   activatedAt: string | null;
+  email: string | null;
 };
 
 type TreeNode = {
@@ -118,9 +121,10 @@ const errorMessages: Record<ErrorCode | "UNKNOWN", string> = {
   SHARE_NOT_FOUND: "Share not found.",
   INTERNAL_ERROR: "The server returned an internal error.",
   UNKNOWN: "The request failed."
+  ,BILLING_NOT_CONFIGURED: "Billing is not configured.", CHECKOUT_NOT_READY: "Please start a subscription first.", PAYMENT_REQUIRED: "An active subscription is required."
 };
 
-async function apiJson<T>(
+export async function apiJson<T>(
   pathname: string,
   options: {
     method?: string;
@@ -176,7 +180,7 @@ function isApiError(value: unknown): value is ApiError {
   return !!value && typeof value === "object" && "error" in value;
 }
 
-function toMessage(error: unknown): string {
+export function toMessage(error: unknown): string {
   if (error instanceof ApiClientError) {
     return errorMessages[error.code] ?? error.message;
   }
@@ -186,23 +190,27 @@ function toMessage(error: unknown): string {
 
 export function App() {
   const slug = window.location.pathname.match(/^\/s\/([^/]+)$/)?.[1];
-  if (slug) {
-    return <PublicSharePage slug={slug} />;
-  }
-
+  if (slug) return <PublicSharePage slug={slug} />;
+  if (window.location.pathname === "/terms") return <TermsPage />;
+  if (window.location.pathname === "/privacy") return <PrivacyPage />;
+  if (window.location.pathname === "/refunds") return <RefundsPage />;
+  if (window.location.pathname === "/contact") return <ContactPage />;
+  if (window.location.pathname === "/") return <LandingPage />;
+  if (window.location.pathname === "/billing") return <BillingPage />;
   return <AuthenticatedApp />;
 }
 
 function AuthenticatedApp() {
+  const authPath = window.location.pathname === "/login" || window.location.pathname === "/register";
   const [auth, setAuth] = useState<AuthState>({
     status: "loading",
-    token: window.localStorage.getItem(tokenStorageKey),
+    token: authPath ? null : window.localStorage.getItem(tokenStorageKey),
     user: null
   });
 
   useEffect(() => {
     let cancelled = false;
-    const token = window.localStorage.getItem(tokenStorageKey);
+    const token = authPath ? null : window.localStorage.getItem(tokenStorageKey);
     if (!token) {
       setAuth({ status: "anonymous", token: null, user: null });
       return;
@@ -214,7 +222,12 @@ function AuthenticatedApp() {
           setAuth({ status: "ready", token, user });
         }
       })
-      .catch(() => {
+      .catch(async () => {
+        try {
+          await apiJson("/api/billing/status", { token });
+          window.location.href = "/billing";
+          return;
+        } catch { /* expired session */ }
         window.localStorage.removeItem(tokenStorageKey);
         if (!cancelled) {
           setAuth({ status: "anonymous", token: null, user: null });
@@ -254,11 +267,13 @@ function AuthenticatedApp() {
 }
 
 function AuthPage({ onLogin }: { onLogin: (token: string, user: PublicUser) => void }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(window.location.pathname === "/register" ? "register" : "login");
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -266,11 +281,13 @@ function AuthPage({ onLogin }: { onLogin: (token: string, user: PublicUser) => v
     setMessage("");
     try {
       if (mode === "register") {
-        const { user } = await apiJson<{ user: PublicUser }>("/api/auth/register", {
+        const { user, token } = await apiJson<{ user: PublicUser; token: string }>("/api/auth/register", {
           method: "POST",
-          body: { username, password }
+          body: { username, password, email }
         });
-        setMessage(`${user.username} is waiting for administrator activation.`);
+        window.localStorage.setItem(tokenStorageKey, token);
+        void user;
+        window.location.href = "/billing";
       } else {
         const result = await apiJson<{ token: string; user: PublicUser }>("/api/auth/login", {
           method: "POST",
@@ -279,16 +296,25 @@ function AuthPage({ onLogin }: { onLogin: (token: string, user: PublicUser) => v
         onLogin(result.token, result.user);
       }
     } catch (error) {
-      setMessage(toMessage(error));
-    } finally {
-      setBusy(false);
-    }
+      if (mode === "login" && error instanceof ApiClientError && error.code === "USER_PENDING") {
+        try {
+          const { token } = await apiJson<{ token: string }>("/api/billing/login", { method: "POST", body: { username, password } });
+          window.localStorage.setItem(tokenStorageKey, token);
+          window.location.href = "/billing";
+          return;
+        } catch (billingError) { setMessage(toMessage(billingError)); }
+      } else setMessage(toMessage(error));
+    } finally { setBusy(false); }
   }
 
   return (
+    <div className="public-account-site">
     <main className="auth-layout">
       <form className="auth-panel" onSubmit={(event) => void submit(event)}>
+        <a href="/">← Home</a>
         <h1>Notes</h1>
+        <p className="landing-copy">A focused Markdown workspace with version history, search, import/export, and sharing.</p>
+        <div className="price-card"><strong>HKD 10 / month</strong><span>Cancel anytime with Stripe.</span></div>
         <div className="segmented">
           <button
             type="button"
@@ -309,6 +335,7 @@ function AuthPage({ onLogin }: { onLogin: (token: string, user: PublicUser) => v
           Username
           <input value={username} onChange={(event) => setUsername(event.target.value)} />
         </label>
+        {mode === "register" && <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>}
         <label>
           Password
           <input
@@ -317,12 +344,15 @@ function AuthPage({ onLogin }: { onLogin: (token: string, user: PublicUser) => v
             onChange={(event) => setPassword(event.target.value)}
           />
         </label>
+        {mode === "register" && <PolicyNotice />}
         <button className="primary" disabled={busy}>
           {busy ? "Working..." : mode === "login" ? "Login" : "Register"}
         </button>
         {message && <p className="message">{message}</p>}
       </form>
     </main>
+    <LegalFooter />
+    </div>
   );
 }
 
@@ -684,8 +714,9 @@ function WorkspacePage({
       <section className="workspace">
         <aside className="sidebar">
           <div className="brand-row">
-            <h1>Notes</h1>
-            <button className="ghost" onClick={onLogout}>
+            <h1><a href="/">Notes</a></h1>
+            <a href="/billing">Billing</a>
+            <button className="ghost" onClick={() => void apiJson("/api/auth/logout", { method: "POST", token }).finally(onLogout)}>
               Logout
             </button>
           </div>
@@ -889,6 +920,7 @@ function WorkspacePage({
     </main>
   );
 }
+
 
 function TreeItem({
   node,

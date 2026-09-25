@@ -75,7 +75,7 @@ export async function createActiveUser(
 }
 
 export async function loginViaUi(page: Page, username: string, password: string): Promise<void> {
-  await page.goto("/");
+  await page.goto("/login");
   await page.locator(".segmented").getByRole("button", { name: "Login" }).click();
   await page.getByLabel("Username").fill(username);
   await page.getByLabel("Password").fill(password);
