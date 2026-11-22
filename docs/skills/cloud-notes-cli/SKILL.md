@@ -7,6 +7,8 @@ description: Operate Cloud Markdown Notes through the notes CLI to inspect or ed
 
 Use the existing `notes` client and run `notes help` for exact syntax. Install or upgrade only when needed for the user's task; do not automatically update to latest. Respect local development-container requirements when installing tools on a managed VPS.
 
+If `notes` is missing, install Node.js 18+ with npm, run `npm install -g cloud-markdown-notes`, then verify with `notes help`.
+
 ## Target and authentication
 
 ```bash
