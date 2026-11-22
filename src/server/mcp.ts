@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { mcpToolCall } from "./auth";
+import { hasMcpLink, makeAuthenticate, mcpToolCall } from "./auth";
 import type { AppConfig } from "./config";
 import type { Database } from "./db";
 
-type Tool = { name: string; description: string; method: string; path: string; inputSchema: Record<string, unknown> };
+type Tool = { name: string; description: string; method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string; inputSchema: Record<string, unknown> };
 const string = (description: string) => ({ type: "string", description });
 const schema = (properties: Record<string, unknown>, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
 const tools: Tool[] = [
@@ -35,9 +35,18 @@ const tools: Tool[] = [
   { name: "import", description: "Apply the same base64 ZIP inspected by import_dry_run when its plan has no conflicts. Imported notes and folders are saved in the workspace.", method: "POST", path: "/api/import", inputSchema: schema({ contentBase64: string("Base64-encoded ZIP archive") }, ["contentBase64"]) }
 ];
 
-export function registerMcpRoutes(app: FastifyInstance, _config: AppConfig, _db: Database): void {
-  app.post("/mcp", async (request, reply) => {
-    const body = request.body as { jsonrpc?: string; id?: string | number; method?: string; params?: any };
+export function registerMcpRoutes(app: FastifyInstance, config: AppConfig, db: Database): void {
+  const authenticate = makeAuthenticate(config, db);
+  app.get("/mcp", (_request, reply) => reply.code(405).header("Allow", "POST").send());
+  app.post("/mcp", {
+    preHandler: async (request, reply) => {
+      if (hasMcpLink(request)) {
+        reply.header("Cache-Control", "no-store");
+        await authenticate(request, reply);
+      }
+    }
+  }, async (request, reply) => {
+    const body = request.body as { jsonrpc?: string; id?: string | number; method?: string; params?: { name?: string; protocolVersion?: string; arguments?: Record<string, unknown> } };
     const id = body?.id ?? null;
     const result = (r: unknown) => reply.send({ jsonrpc: "2.0", id, result: r });
     if (body?.jsonrpc !== "2.0" || !body.method) return reply.send({ jsonrpc: "2.0", id, error: { code: -32600, message: "Invalid Request" } });
@@ -59,7 +68,10 @@ export function registerMcpRoutes(app: FastifyInstance, _config: AppConfig, _db:
         payload = Buffer.from(args.contentBase64, "base64");
         headers["content-type"] = "application/zip";
       }
-      const response = await mcpToolCall.run(true, () => app.inject({ method: tool.method, url: path, headers, payload } as any));
+      // Start the lazy injection inside the authenticated dispatch context.
+      const response = await mcpToolCall.run({ user: request.currentUser }, async () =>
+        await app.inject({ method: tool.method, url: path, headers, payload })
+      );
       let data: unknown; try { data = JSON.parse(response.body); } catch { data = response.body; }
       return result({ content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }], isError: response.statusCode >= 400 });
     }

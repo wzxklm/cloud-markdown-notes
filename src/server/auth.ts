@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { createHmac, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
+import type { IncomingMessage } from "node:http";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { promisify } from "node:util";
 import { apiSuccess } from "../shared/api";
@@ -319,25 +320,46 @@ export function requireCurrentUser(
 }
 
 // Only the in-process dispatch of an MCP tool may authenticate a personal key.
-export const mcpToolCall = new AsyncLocalStorage<boolean>();
+export const mcpToolCall = new AsyncLocalStorage<{ user?: AuthenticatedUser }>();
+const linkCredentials = new WeakMap<IncomingMessage, string>();
+
+// Fastify calls rewriteUrl before routing or logging, including for unsupported methods.
+export function redactMcpUrl(raw: IncomingMessage & { originalUrl?: string }): string {
+  const url = raw.url ?? "/";
+  if (!url.startsWith("/mcp?")) return url;
+  raw.originalUrl = "/mcp";
+  const links = new URLSearchParams(url.slice("/mcp?".length)).getAll("link");
+  if (links.length) linkCredentials.set(raw, links.length === 1 ? links[0] : "");
+  return "/mcp";
+}
+
+export function hasMcpLink(request: FastifyRequest): boolean {
+  return linkCredentials.has(request.raw);
+}
 
 export function makeAuthenticate(config: AppConfig, db: Database) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const dispatch = mcpToolCall.getStore();
+    if (dispatch?.user) {
+      request.currentUser = dispatch.user;
+      return;
+    }
     await expirePaidAccess(db);
-    const token = getBearerToken(request);
-    if (!token) {
+    const link = linkCredentials.get(request.raw);
+    const token = link ?? getBearerToken(request);
+    if (!token || (link !== undefined && request.headers.authorization !== undefined)) {
       void reply.status(401).send(apiError("UNAUTHENTICATED", "Authentication is required."));
       return;
     }
 
     const tokenHash = hashSessionToken(token, config.sessionSecret);
-    const useMcpKey = mcpToolCall.getStore() && token.startsWith("notes_mcp.");
+    const useMcpKey = link !== undefined || (dispatch && token.startsWith("notes_mcp."));
     const result = await db.query<PublicUserRow>(
       `
         select u.id, u.username, u.role, u.status, u.created_at, u.activated_at, u.email
         from ${useMcpKey ? "mcp_keys" : "sessions"} s
         join users u on u.id = s.user_id
-        where s.token_hash = $1
+        where s.${link !== undefined ? "link_hash" : "token_hash"} = $1
           ${useMcpKey ? "" : "and s.expires_at > now() and s.scope = 'workspace'"}
       `,
       [tokenHash]

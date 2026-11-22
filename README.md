@@ -18,7 +18,7 @@ Cloud Markdown Notes is a self-hosted Markdown service with a separate workspace
 | --- | --- |
 | Web | Sign up or log in at [Notes](https://notes.bosschat.de). An administrator can activate a new account, or users can subscribe on an instance with billing enabled. |
 | CLI | Install Node.js 18 or later, set your instance URL, and log in. See the [CLI guide](packages/cli/README.md) and the [CLI skill for AI assistants](docs/skills/cloud-notes-cli/SKILL.md). |
-| MCP | Create a personal MCP key in your workspace and connect your client to the instance’s `/mcp` endpoint over Streamable HTTP. See the [MCP connection guide](docs/connect-notes-mcp.md). |
+| MCP | Create a personal MCP key in your workspace and use its private connection URL in ChatGPT, or use the key as a Bearer token at `/mcp`. See the [MCP connection guide](docs/connect-notes-mcp.md). |
 | HTTP API | Use a session bearer token with the notes, search, version, and sharing endpoints under `/api`. Supply the file version you read when editing to detect concurrent changes. See the [feature and API reference (Chinese)](docs/可测试功能.md). |
 
 ## Self-hosting and billing

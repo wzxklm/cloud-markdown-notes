@@ -18,7 +18,7 @@ Cloud Markdown Notes 是可自托管的多用户 Markdown 笔记服务。你可�
 | --- | --- |
 | Web | 在 [Notes 官网](https://notes.bosschat.de) 注册或登录。新账号由管理员激活，也可在启用计费的实例上订阅。 |
 | CLI | 安装 Node.js 18 或更新版本，按 [CLI 使用说明](packages/cli/README.md) 设置实例地址并登录。仓库提供可交给 AI 使用的 [CLI skill](docs/skills/cloud-notes-cli/SKILL.md)。 |
-| MCP | 在工作区创建个人 MCP 密钥，通过 Streamable HTTP 连接实例的 `/mcp` 端点。详见 [MCP 连接指南](docs/connect-notes-mcp.md)。 |
+| MCP | 在工作区创建个人 MCP 密钥，在 ChatGPT 网页版粘贴配套的专用连接，或在其他客户端通过 Bearer 密钥连接 `/mcp`。详见 [MCP 连接指南](docs/connect-notes-mcp.md)。 |
 | HTTP API | 使用会话 Bearer token 访问 `/api` 下的笔记、搜索、版本和分享接口。编辑时传入读到的文件版本以检测冲突。详见 [接口与功能清单](docs/可测试功能.md)。 |
 
 ## 自托管与计费

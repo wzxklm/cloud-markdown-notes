@@ -17,9 +17,16 @@ test("creates and revokes a personal MCP key", async ({ page, request }) => {
   await expect(page.getByText("Key copied.")).toBeVisible();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied === await secret.inputValue()).toBe(true);
+  const link = page.getByLabel("ChatGPT connection URL");
+  const url = new URL(await link.inputValue());
+  expect(url.origin === new URL(page.url()).origin && url.pathname === "/mcp" && url.searchParams.has("link")).toBe(true);
+  await page.getByRole("button", { name: "Copy ChatGPT link" }).click();
+  await expect(page.getByText("ChatGPT link copied.")).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText()) === url.href).toBe(true);
   await page.goto("/app");
   await page.getByRole("button", { name: "MCP keys" }).click();
   await expect(secret).toHaveCount(0);
+  await expect(link).toHaveCount(0);
   const revoke = page.getByRole("button", { name: "Revoke Laptop" });
   page.once("dialog", dialog => dialog.accept());
   await revoke.click();

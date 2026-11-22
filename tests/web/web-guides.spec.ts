@@ -15,5 +15,6 @@ test("anonymous homepage guides support navigation, direct links and the complet
   await page.reload();
   await expect(page.getByRole("heading", { name: "Create a key" })).toBeVisible();
   await expect(page.getByText(new URL("/mcp", page.url()).href, { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ChatGPT on the web" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

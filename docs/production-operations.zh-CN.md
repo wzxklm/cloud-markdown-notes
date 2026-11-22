@@ -24,10 +24,12 @@ curl -fsS http://127.0.0.1:18081/api/health
 | 凭据、外部地址、Stripe 配置 | `.env.prod` |
 | 镜像和数据库备份 | `backups/` |
 
-应用镜像为 `local/notes:cli-url-20261122`，数据库镜像由生产 Compose 固定，两者均为 `pull_policy: never`。恢复时，应用镜像从 `backups/cli-url-20261122T165755Z/release-image.tar.gz` 导入，数据库镜像从 `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` 导入，命令为 `gzip -dc <归档路径> | docker image load`。升级前执行一致性备份，再显式修改 Compose 的 `image`。
+应用镜像为 `local/notes:mcp-link-20261122`，数据库镜像由生产 Compose 固定，两者均为 `pull_policy: never`。恢复时，应用镜像从 `backups/mcp-link-20261122T174659Z/release-image.tar.gz` 导入，数据库镜像从 `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` 导入，命令为 `gzip -dc <归档路径> | docker image load`。升级前执行一致性备份，再显式修改 Compose 的 `image`。
 生产启动会执行数据库迁移，再启动 API/Web。Web 将 `/api/*` 和 `/mcp` 代理到 API，其他页面使用 SPA fallback。
 
 生产凭据只存 `.env.prod`；不要从 example 覆盖。`PROD_HOST_API_PORT=18081`、`PROD_HOST_WEB_PORT=5173`，`PUBLIC_BASE_URL=https://notes.bosschat.de`。Nginx 清单见 `/root/nginx/sites.json`，生成站点为 `/root/nginx/config/conf.d/notes.conf`。
+
+启用 ChatGPT 专用连接前，为 Notes 反代的 `/mcp` 精确路径配置访问日志省略查询参数，并避免错误日志记录完整请求。即使访问日志使用 `$uri`，Nginx 在上游故障时仍可能将完整请求写入错误日志。用无效的测试参数核对正常与故障两种情况。
 
 迁移时同时准备 Nginx、DNS、证书和防火墙设置。主机通用备份流程见 VPS 上的 `/root/README.md`。以下相对路径以项目根目录为准。
 

@@ -974,7 +974,7 @@ type McpKey = { id: string; name: string; createdAt: string };
 function McpKeys({ token }: { token: string }) {
   const [keys, setKeys] = useState<McpKey[]>([]);
   const [name, setName] = useState("");
-  const [issued, setIssued] = useState<{ key: McpKey; secret: string } | null>(null);
+  const [issued, setIssued] = useState<{ key: McpKey; secret: string; linkPath: string } | null>(null);
   const [busy, setBusy] = useState(true);
   const [notice, setNotice] = useState("");
 
@@ -991,7 +991,7 @@ function McpKeys({ token }: { token: string }) {
     setBusy(true);
     setNotice("");
     try {
-      const result = await apiJson<{ key: McpKey; secret: string }>("/api/mcp-keys", {
+      const result = await apiJson<{ key: McpKey; secret: string; linkPath: string }>("/api/mcp-keys", {
         token, method: "POST", body: { name }
       });
       setKeys(previous => [result.key, ...previous]);
@@ -1003,7 +1003,7 @@ function McpKeys({ token }: { token: string }) {
   }
 
   async function revoke(key: McpKey) {
-    if (!window.confirm("Revoke " + key.name + "? Clients using this key will lose access.")) return;
+    if (!window.confirm("Revoke " + key.name + "? The key and its ChatGPT connection link will stop working.")) return;
     setBusy(true);
     setNotice("");
     try {
@@ -1015,6 +1015,7 @@ function McpKeys({ token }: { token: string }) {
     } finally { setBusy(false); }
   }
 
+  const connectionUrl = issued ? new URL(issued.linkPath, window.location.origin).href : "";
   return <section className="tool-stack" aria-label="Personal MCP keys">
     <p>Use a separate key for each client. Each key grants MCP access to your workspace until revoked.</p>
     <label>MCP server URL<input readOnly value={window.location.origin + "/mcp"} /></label>
@@ -1027,6 +1028,11 @@ function McpKeys({ token }: { token: string }) {
       <button onClick={() => void navigator.clipboard.writeText(issued.secret)
         .then(() => setNotice("Key copied."))
         .catch(() => setNotice("Select the key and copy it manually."))} disabled={!navigator.clipboard}>Copy key</button>
+      <label>ChatGPT connection URL<input readOnly value={connectionUrl} onFocus={event => event.target.select()} /></label>
+      <p>In ChatGPT, paste this private URL as the MCP server URL and choose No authentication. Anyone with the URL can access your notes. Copy it now.</p>
+      <button disabled={!navigator.clipboard} onClick={() => void navigator.clipboard.writeText(connectionUrl)
+        .then(() => setNotice("ChatGPT link copied."))
+        .catch(() => setNotice("Select the URL and copy it manually."))}>Copy ChatGPT link</button>
     </div>}
     {keys.map(key => <div key={key.id}>
       <span>{key.name} · {new Date(key.createdAt).toLocaleDateString()}</span>{" "}

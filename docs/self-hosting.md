@@ -59,6 +59,8 @@ dc=(docker compose --env-file .env.prod -f docker/compose.selfhost.yml)
 "${dc[@]}" ps
 ```
 
+Private ChatGPT connection URLs carry a credential in the query string. Configure proxies, error logs and tracing to omit MCP request URLs and query parameters, including on upstream failures.
+
 Point the reverse proxy at `127.0.0.1:5173` (or your configured web port), preserving the request path and Authorization header. Check the homepage, contact page, and `/api/health`. Run `"${dc[@]}" logs --tail 100` to read logs or `"${dc[@]}" stop` to stop the services. Database and workspace data live under `PROD_HOST_DATA_ROOT`, relative to the Compose file directory. The template uses `docker/runtime/selfhost/`.
 
 Before upgrading, stop writes and back up the database, workspaces, environment file, and current image reference. For a published image, pull the target release and check its configuration. For a source build, build a new tag from the target commit. Keep the existing environment settings and data paths, update `NOTES_IMAGE`, and run the same `up -d --wait` command.

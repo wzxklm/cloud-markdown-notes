@@ -61,6 +61,8 @@ dc=(docker compose --env-file .env.prod -f docker/compose.selfhost.yml)
 "${dc[@]}" ps
 ```
 
+ChatGPT 专用连接的查询参数含凭据。反向代理、错误日志和链路追踪必须省略 MCP 请求的完整 URL 和查询参数，包括上游故障时的请求。
+
 反代到 `127.0.0.1:5173`（若改过 Web 端口则相应调整），保留请求路径和 Authorization 头。访问首页、联系页面与 `/api/health`。日常日志用 `"${dc[@]}" logs --tail 100`，停止用 `"${dc[@]}" stop`。数据库与工作区位于相对于 Compose 文件目录的 `PROD_HOST_DATA_ROOT`，按模板默认为 `docker/runtime/selfhost/`。
 
 升级时先停写并备份数据库、工作区、环境文件和原镜像引用。镜像部署重新拉取目标版本并核对该版本配置；源码部署从目标提交构建新标签。保留原有私有配置与数据路径，更新 `NOTES_IMAGE` 后执行同一条 `up -d --wait` 命令。

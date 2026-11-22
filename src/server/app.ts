@@ -3,7 +3,7 @@ import Fastify from "fastify";
 import type { ApiSuccess, HealthStatus } from "../shared/api";
 import { apiSuccess } from "../shared/api";
 import { apiError } from "../shared/errors";
-import { ensureAdminUser, registerAuthRoutes } from "./auth";
+import { ensureAdminUser, redactMcpUrl, registerAuthRoutes } from "./auth";
 import type { AppConfig } from "./config";
 import { registerContentRoutes } from "./content";
 import { getDatabase, type Database } from "./db";
@@ -24,6 +24,7 @@ export type AppDependencies = {
 
 export function buildApp(config: AppConfig, dependencies: AppDependencies = {}) {
   const app = Fastify({
+    rewriteUrl: redactMcpUrl,
     logger: config.appEnv !== "test"
   });
   const db = dependencies.database ?? getDatabase(config);

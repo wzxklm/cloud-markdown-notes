@@ -6,7 +6,13 @@ const adminUsername = process.env.ADMIN_USERNAME ?? "admin";
 const adminPassword = process.env.ADMIN_PASSWORD ?? "admin-password";
 let requestId = 0;
 
-type RpcResponse = { result?: any; error?: { code: number; message: string } };
+type RpcResult = {
+  serverInfo?: { name: string };
+  tools?: { name: string }[];
+  content?: { text: string }[];
+  isError?: boolean;
+};
+type RpcResponse = { result?: RpcResult; error?: { code: number; message: string } };
 
 async function rpc(method: string, params: unknown = {}, auth?: string | Record<string, string>): Promise<RpcResponse> {
   const response = await fetch(mcpUrl, {
@@ -21,13 +27,13 @@ async function rpc(method: string, params: unknown = {}, auth?: string | Record<
   return (await response.json()) as RpcResponse;
 }
 
-async function tool(name: string, args: Record<string, unknown>, auth?: string | Record<string, string>): Promise<any> {
+async function tool(name: string, args: Record<string, unknown>, auth?: string | Record<string, string>): Promise<RpcResult> {
   const response = await rpc("tools/call", { name, arguments: args }, auth);
   assert.ok(response.result, `Missing result for ${name}`);
   return response.result;
 }
 
-function text(result: any): string {
+function text(result: RpcResult): string {
   return result.content?.[0]?.text ?? "";
 }
 
@@ -73,10 +79,29 @@ async function main(): Promise<void> {
     const res = await api("/mcp-keys", "POST", session, { name });
     assert.equal(res.status, 201);
     assert.equal(res.headers.get("cache-control"), "no-store");
-    return (await res.json()).data as { key: { id: string }; secret: string };
+    return (await res.json()).data as { key: { id: string }; secret: string; linkPath: string };
   }
   const laptop = await issue("Laptop");
   const desktop = await issue("Desktop");
+  async function linked(path: string, method: string, params = {}, bearer?: string) {
+    return fetch(new URL(path, process.env.WEB_BASE_URL ?? mcpUrl), {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(bearer ? { authorization: "Bearer " + bearer } : {}) },
+      body: JSON.stringify({ jsonrpc: "2.0", id: ++requestId, method, params })
+    });
+  }
+  for (const method of ["initialize", "tools/list"]) {
+    const response = await linked(laptop.linkPath, method);
+    assert.equal(response.status, 200);
+    assert.ok((await response.json()).result);
+  }
+  for (const path of ["/mcp?link=", "/mcp?link=invalid", "/mcp?link=" + laptop.secret, "/mcp?link=" + session]) {
+    assert.equal((await linked(path, "initialize")).status, 401);
+  }
+  assert.equal((await linked(laptop.linkPath, "initialize", {}, token)).status, 401);
+  const linkToken = new URL(laptop.linkPath, mcpUrl).searchParams.get("link")!;
+  assert.equal((await api("/auth/me", "GET", linkToken)).status, 401);
+  assert.equal((await tool("tree", {}, linkToken)).isError, true);
   const list = (await (await api("/mcp-keys", "GET", session)).json()).data.keys;
   assert.equal(list.length, 2);
   assert.deepEqual(Object.keys(list[0]).sort(), ["createdAt", "id", "name"]);
@@ -84,12 +109,21 @@ async function main(): Promise<void> {
   assert.equal((await api("/auth/me", "GET", laptop.secret)).status, 401);
   assert.equal((await tool("tree", {}, { "X-Notes-Username": username, "X-Notes-Password": password })).isError, true);
   assert.equal((await tool("tree", {}, { authorization: "Basic " + Buffer.from(username + ":" + password).toString("base64") })).isError, true);
-  assert.equal((await tool("note_create", { path: "/private.md", content: "user only" }, laptop.secret)).isError, false);
+  const privateNote = await tool("note_create", { path: "/private.md", content: "user only" }, laptop.secret);
+  assert.equal(privateNote.isError, false, text(privateNote));
   assert.equal((await tool("note_read", { path: "/private.md" }, token)).isError, true);
+  const readParams = { name: "note_read", arguments: { path: "/private.md" } };
+  const own = await linked(laptop.linkPath, "tools/call", readParams);
+  assert.match(text((await own.json()).result), /user only/);
+  const changed = await linked(laptop.linkPath, "tools/call", { name: "note_create", arguments: { path: "/link.md", content: "written via link" } });
+  assert.equal((await changed.json()).result.isError, false);
+  assert.equal((await tool("note_read", { path: "/link.md" }, token)).isError, true);
   await api("/mcp-keys/" + laptop.key.id, "DELETE", token);
   assert.match(text(await tool("note_read", { path: "/private.md" }, laptop.secret)), /user only/);
   assert.equal((await api("/mcp-keys/" + laptop.key.id, "DELETE", session)).status, 200);
   assert.equal((await tool("tree", {}, laptop.secret)).isError, true);
+  assert.equal((await linked(laptop.linkPath, "tools/call", readParams)).status, 401);
+  assert.equal((await linked(desktop.linkPath, "tools/call", readParams)).status, 200);
   assert.equal((await api("/auth/logout", "POST", session, {})).status, 200);
   assert.match(text(await tool("note_read", { path: "/private.md" }, desktop.secret)), /user only/);
 

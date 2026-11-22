@@ -24,11 +24,13 @@ In the same Bash shell, use `"${dc[@]}" logs --tail 100` to inspect logs, `"${dc
 | Credentials, public URL, and Stripe settings | `.env.prod` |
 | Image and database backups | `backups/` |
 
-The application image is `local/notes:cli-url-20261122`. Production Compose also pins the database image and sets `pull_policy: never` for both services. To restore the images, load the application archive at `backups/cli-url-20261122T165755Z/release-image.tar.gz` and the database image from `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` using `gzip -dc <archive> | docker image load`. Take a consistent backup before updating the Compose image reference.
+The application image is `local/notes:mcp-link-20261122`. Production Compose also pins the database image and sets `pull_policy: never` for both services. To restore the images, load the application archive at `backups/mcp-link-20261122T174659Z/release-image.tar.gz` and the database image from `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` using `gzip -dc <archive> | docker image load`. Take a consistent backup before updating the Compose image reference.
 
 Startup runs database migrations before the API and web services. The web service proxies `/api/*` and `/mcp` to the API and serves the SPA entry point for client-side routes.
 
 Keep production credentials in the private `.env.prod` file. Preserve it when updating from the example. The instance uses `PROD_HOST_API_PORT=18081`, `PROD_HOST_WEB_PORT=5173`, and `PUBLIC_BASE_URL=https://notes.bosschat.de`. The Nginx site manifest is `/root/nginx/sites.json` and the generated configuration is `/root/nginx/config/conf.d/notes.conf`.
+
+Before enabling private ChatGPT connection URLs, configure the Notes proxy to omit query parameters from access logs and suppress request URLs in errors for the exact `/mcp` location. Nginx upstream failures can include the original request even when the access log uses `$uri`. Verify both paths with a dummy query value.
 
 For a host migration, prepare Nginx, DNS, certificates, and firewall settings as well as the application data. The VPS backup procedure is in `/root/README.md` on the host.
 
