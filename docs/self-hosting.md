@@ -1,12 +1,12 @@
-# 自托管 Notes
+# Self-hosting Notes
 
-两种方式都使用 Docker Compose 运行应用和 PostgreSQL。选下面一种准备应用镜像和部署文件，再完成[配置与启动](#配置与启动)。示例命令使用 Bash。对公网提供服务还需要域名和 HTTPS 反向代理。
+**English** · [简体中文](self-hosting.zh-CN.md)
 
-## 从公开镜像部署
+Notes runs the app and PostgreSQL with Docker Compose. Choose one of the two methods below, then [configure and start the instance](#configure-and-start-the-instance). The commands use Bash. For a public instance, you also need a domain and an HTTPS reverse proxy.
 
-适合直接运行官方发行版。主机需要 Docker Compose 和 curl，无需安装 Git、Node.js 或构建应用。
+## Deploy a published image
 
-在新目录拉取镜像。从镜像标签读取对应的 Git 提交，再下载该版本的配置文件。这里用 `latest` 选择当前发行镜像，实际部署固定到拉取时的摘要。
+Use this method to run an official release. You need Docker with Compose and curl. Pull the image, read its Git revision, and download the configuration from that same revision. The example uses `latest` to select a release and then pins the deployed image by digest.
 
 ```bash
 mkdir notes-selfhost && cd notes-selfhost
@@ -21,36 +21,36 @@ done
 docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image"
 ```
 
-在下一步将输出中以 `miketop/cloud-markdown-notes@sha256:` 开头的完整引用填入 `NOTES_IMAGE`。`compose.selfhost.yml` 复用同目录的 `compose.prod.yml`，启动时只指定自托管文件。
+Set `NOTES_IMAGE` to the full reference beginning with `miketop/cloud-markdown-notes@sha256:` in the output. Keep both Compose files in the same directory. The self-hosting file extends the production file, so only pass the self-hosting file when starting the app.
 
-## 从源码部署
+## Build from source
 
-适合运行指定提交或自己的修改。主机需要 Git 和 Docker Compose。Dockerfile 的 `production` 阶段会在构建容器中安装依赖、编译前后端并打包运行环境。
+Use this method to deploy a specific commit or your own changes. You need Git and Docker with Compose. The Dockerfile’s `production` target installs dependencies, compiles the frontend and backend, and packages the runtime in the image.
 
 ```bash
 git clone https://github.com/wzxklm/cloud-markdown-notes.git
 cd cloud-markdown-notes
-# 如需部署指定版本，在构建前执行 git checkout <tag-or-commit>
+# To build a specific revision, first run git checkout <tag-or-commit>
 image="notes-selfhost:$(git rev-parse --short=12 HEAD)"
 docker build --target production -f docker/Dockerfile -t "$image" .
 echo "$image"
 ```
 
-将输出的本地镜像名填入 `NOTES_IMAGE`。如果维护自己的改动，先提交再构建，便于根据镜像标签找到对应源码。
+Set `NOTES_IMAGE` to the local image name printed above. Commit local changes before building if you want the tag to identify the exact source.
 
-## 配置与启动
+## Configure and start the instance
 
-在所选方式的部署目录中，为新实例执行：
+From the deployment directory created above, create a private environment file for the new instance:
 
 ```bash
 (umask 077; cp -n .env.prod.example .env.prod)
 ```
 
-编辑 `.env.prod`：
+Edit `.env.prod`:
 
-- 填入上一步确定的 `NOTES_IMAGE`。分别设置 `POSTGRES_PASSWORD`、`SESSION_SECRET` 和 `ADMIN_PASSWORD`，可用 `openssl rand -hex 32` 生成。同步替换 `DATABASE_URL` 中的数据库密码。
-- 将 `PUBLIC_BASE_URL` 和 `NOTES_API_URL` 设为自己的 HTTPS 站点，填写 `SITE_OPERATOR` 和 `SUPPORT_EMAIL`。
-- Stripe 配置可以留空；需要订阅或一次性充值时，再按下文配置。
+- Set `NOTES_IMAGE` to the digest or local tag selected above. Generate separate values for `POSTGRES_PASSWORD`, `SESSION_SECRET`, and `ADMIN_PASSWORD`, for example with `openssl rand -hex 32`. Set the password in `DATABASE_URL` to the same value as `POSTGRES_PASSWORD`.
+- Set `PUBLIC_BASE_URL` and `NOTES_API_URL` to your HTTPS origin. Set `SITE_OPERATOR` and `SUPPORT_EMAIL` for your instance.
+- You can leave the Stripe settings empty. To offer subscriptions or one-time top-ups, follow the sandbox instructions below.
 
 ```bash
 dc=(docker compose --env-file .env.prod -f docker/compose.selfhost.yml)
@@ -59,34 +59,34 @@ dc=(docker compose --env-file .env.prod -f docker/compose.selfhost.yml)
 "${dc[@]}" ps
 ```
 
-反代到 `127.0.0.1:5173`（若改过 Web 端口则相应调整），保留请求路径和 Authorization 头。访问首页、联系页面与 `/api/health`。日常日志用 `"${dc[@]}" logs --tail 100`，停止用 `"${dc[@]}" stop`。数据库与工作区位于相对于 Compose 文件目录的 `PROD_HOST_DATA_ROOT`，按模板默认为 `docker/runtime/selfhost/`。
+Point the reverse proxy at `127.0.0.1:5173` (or your configured web port), preserving the request path and Authorization header. Check the homepage, contact page, and `/api/health`. Run `"${dc[@]}" logs --tail 100` to read logs or `"${dc[@]}" stop` to stop the services. Database and workspace data live under `PROD_HOST_DATA_ROOT`, relative to the Compose file directory. The template uses `docker/runtime/selfhost/`.
 
-升级时先停写并备份数据库、工作区、环境文件和原镜像引用。镜像部署重新拉取目标版本并核对该版本配置；源码部署从目标提交构建新标签。保留原有私有配置与数据路径，更新 `NOTES_IMAGE` 后执行同一条 `up -d --wait` 命令。
+Before upgrading, stop writes and back up the database, workspaces, environment file, and current image reference. For a published image, pull the target release and check its configuration. For a source build, build a new tag from the target commit. Keep the existing environment settings and data paths, update `NOTES_IMAGE`, and run the same `up -d --wait` command.
 
-## Stripe 沙箱配置
+## Stripe sandbox setup
 
-全程选用同一个沙箱。以下设置采用服务内置的港币价格。费用与有效期由 Webhook 确认。
+Use one sandbox for all of the settings below. Notes uses Hong Kong dollars. Webhooks confirm payment and the paid access period.
 
-| 配置 | 在 Stripe 中准备的值 |
-|---|---|
-| STRIPE_SECRET_KEY、STRIPE_LIVEMODE | 沙箱 API secret key，模式填 false |
-| STRIPE_PRICE_ID | 活跃的循环 Price，HK$10、每 1 个月。卡订阅使用 Managed Payments 和固定的 `2026-02-25.preview` API，先确认你的账户可用。 |
-| STRIPE_TOPUP_PRODUCT_ID | 一次性余额充值使用的活跃 Product ID |
-| STRIPE_TOPUP_PRICE_10 / _30 / _100 | 可选。同一充值产品下对应金额的一次性 HKD Price。留空时服务按用户选择的金额创建价格数据。 |
-| STRIPE_WEBHOOK_SECRET | 以下 Webhook 端点自己的签名密钥 |
+| Setting | Value |
+| --- | --- |
+| `STRIPE_SECRET_KEY`, `STRIPE_LIVEMODE` | The sandbox API secret key and `false`, respectively. |
+| `STRIPE_PRICE_ID` | An active recurring price of HK$10 every month. Card subscriptions use Managed Payments and the pinned `2026-02-25.preview` API. Confirm your account supports them. |
+| `STRIPE_TOPUP_PRODUCT_ID` | An active product ID for one-time wallet top-ups. |
+| `STRIPE_TOPUP_PRICE_10`, `STRIPE_TOPUP_PRICE_30`, `STRIPE_TOPUP_PRICE_100` | Optional one-time HKD price IDs on the same product for each amount. Leave blank to generate price data for the amount selected. |
+| `STRIPE_WEBHOOK_SECRET` | The signing secret for the webhook endpoint below. |
 
-在 Dashboard 配置 Customer Portal，启用符合站点约定的订阅取消方式。在事件目的地新增快照 Webhook，指向 `https://你的域名/api/billing/webhook`，快照事件版本选用 `2026-08-26.dahlia`，订阅以下事件：
+Configure the Customer Portal in the Stripe Dashboard and enable the cancellation policy your site offers. Create a snapshot webhook destination at `https://your-domain/api/billing/webhook` with snapshot event version `2026-08-26.dahlia`. Subscribe to these events:
 
-- Checkout：`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`、`checkout.session.expired`
-- 发票和订阅：`invoice.paid`、`invoice.payment_failed`、`customer.subscription.updated`、`customer.subscription.deleted`
-- 退款与争议：`charge.refunded`、`refund.updated`、`charge.dispute.funds_withdrawn`、`charge.dispute.funds_reinstated`
+- Checkout: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`
+- Invoices and subscriptions: `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`
+- Refunds and disputes: `charge.refunded`, `refund.updated`, `charge.dispute.funds_withdrawn`, `charge.dispute.funds_reinstated`
 
-配置参考：[Stripe Managed Payments](https://docs.stripe.com/payments/managed-payments)、[Customer Portal](https://docs.stripe.com/customer-management/integrate-customer-portal)、[Webhook](https://docs.stripe.com/webhooks)。
+See Stripe’s guides to [Managed Payments](https://docs.stripe.com/payments/managed-payments), the [Customer Portal](https://docs.stripe.com/customer-management/integrate-customer-portal), and [webhooks](https://docs.stripe.com/webhooks).
 
-## 验收两条支付路径
+## Verify both payment flows
 
-1. 注册两个带邮箱的普通用户，让两者保持待激活。在沙箱使用 [Stripe 测试付款方式](https://docs.stripe.com/testing)。
-2. **卡订阅**：第一个用户选择 HK$10/月，完成测试支付。检查 Dashboard 投递返回 2xx，刷新 Billing 后查看已付期限并进入工作区。进入 Portal 设置到期取消，返回后应显示取消安排，已付期限保留。
-3. **一次性充值**：第二个用户充值 HK$30，确认钱包增加 HK$30、只有一条入账记录、余额续费仍关闭。重新投递同一成功事件，余额应保持 HK$30。再主动开启余额续费，确认扣除 HK$10、剩余 HK$20 并取得一个月访问权限。
-4. **失败和退款**：另开测试充值并取消，确认余额未增加。在 Dashboard 对成功充值发起部分测试退款，确认出现等额冲正。对测试卡订阅付款执行退款并确认原订阅取消、原授权撤销。排障时检查事件投递状态与 app 日志。
-5. 正式启用时换成 live API key、live 商品/价格、live Webhook 端点签名密钥，设置 `STRIPE_LIVEMODE=true` 并单独配置 live Portal。沙箱与正式实例使用独立数据库和工作区。
+1. Register two ordinary users with email addresses. Leave both pending and use [Stripe test payment methods](https://docs.stripe.com/testing).
+2. **Card subscription.** Subscribe the first user for HK$10/month. Verify the webhook delivery returns 2xx, refresh Billing, check the paid-through date, and open the workspace. Schedule cancellation at period end in the Portal. Billing should show the cancellation and retain paid access.
+3. **Wallet top-up.** Top up the second user by HK$30. Verify there is one credit, the balance is HK$30, and balance renewal is off. Redeliver the success event and verify the balance stays at HK$30. Enable balance renewal. Verify a HK$10 deduction, a HK$20 balance, and one month of access.
+4. **Cancellations and refunds.** Start another test top-up and cancel it. Verify the balance does not increase. Issue a partial test refund against the successful top-up and check for a reversal of the same amount. Refund the test card subscription payment and verify that its subscription is canceled and its access revoked. Use delivery status and app logs to investigate discrepancies.
+5. **Go live.** Use a separate database and workspaces for the live instance. Switch to the live API key, products, prices, and webhook signing secret, set `STRIPE_LIVEMODE=true`, and configure the live Customer Portal separately.
