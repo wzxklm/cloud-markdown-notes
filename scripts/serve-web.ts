@@ -38,6 +38,12 @@ const server = createServer((req, res) => {
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+  if (requestUrl.pathname === "/site-config.js" && process.env.SUPPORT_EMAIL && process.env.SITE_OPERATOR) {
+    res.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" });
+    const contact = { email: process.env.SUPPORT_EMAIL, operator: process.env.SITE_OPERATOR };
+    res.end(`window.notesContact = ${JSON.stringify(contact)};`);
+    return;
+  }
   if (requestUrl.pathname.startsWith("/api/") || requestUrl.pathname === "/mcp") {
     proxyToApi(req, res, requestUrl);
     return;

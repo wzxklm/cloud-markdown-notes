@@ -23,14 +23,14 @@ export function HomeGuides() {
         <h3><a href="#cli-guide">Use the Notes CLI with AI</a></h3>
         {hash === "#cli-guide" && <>
           <p>Install the CLI with <code>npm install -g cloud-markdown-notes</code> (Node.js 18+).
-            Configure it with <code>notes config set-api-url https://notes.bosschat.de</code>.
+            Configure it with <code>notes config set-api-url {window.location.origin}</code>.
             For Codex, save <a href="/guides/SKILL.md" download="SKILL.md">the complete SKILL.md</a> in <code>~/.codex/skills/cloud-notes-cli/</code>.</p>
           <MarkdownPreview content={skill.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, "").replace(/^# Cloud Notes CLI\s*/, "")} />
         </>}
       </article>
       <article id="mcp-guide">
         <h3><a href="#mcp-guide">Connect Notes to an MCP client</a></h3>
-        {hash === "#mcp-guide" && <MarkdownPreview content={mcp} />}
+        {hash === "#mcp-guide" && <MarkdownPreview content={mcp.replaceAll("https://notes.example.com", window.location.origin)} />}
       </article>
     </section>
   );

@@ -14,6 +14,6 @@ test("anonymous homepage guides support navigation, direct links and the complet
   await page.goto("/#mcp-guide");
   await page.reload();
   await expect(page.getByRole("heading", { name: "Create a key" })).toBeVisible();
-  await expect(page.getByText("https://notes.bosschat.de/mcp", { exact: true })).toBeVisible();
+  await expect(page.getByText(new URL("/mcp", page.url()).href, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

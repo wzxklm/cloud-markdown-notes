@@ -18,7 +18,7 @@ const db = getDatabase(config);
 const stripe = new Stripe("sk_test_fixture");
 const response = <T>(value: unknown) => value as Stripe.Response<T>;
 function list<T>(data: T[]) {
-  return Object.assign(Promise.resolve({ data, has_more: false }), {
+  return Object.assign(Promise.resolve({ data: data.slice(0, 100), has_more: data.length > 100 }), {
     async *[Symbol.asyncIterator]() {
       yield* data;
     }
@@ -65,6 +65,7 @@ stripe.invoices.retrieve = async (id) =>
 stripe.invoices.listLineItems = ((id: string) => {
   const f = fixtures.find((f) => f.invoice.id === id)!;
   return list([
+    ...Array.from({ length: 100 }, () => ({ pricing: null, parent: null, period: { end: 0 } })),
     {
       pricing: { price_details: { price: f.sub.items.data[0].price.id } },
       parent: { subscription_item_details: { proration: false } },
@@ -199,6 +200,18 @@ async function revoked(f: Fixture) {
   assert.equal(access.statusCode, 403, "Existing workspace sessions must lose access immediately");
 }
 try {
+  const paged = await fixture();
+  for (const paidEvent of [
+    event("invoice.paid", paged.invoice),
+    event("checkout.session.completed", {
+      id: "cs_" + paged.sub.id.slice(4), customer: paged.sub.customer, mode: "subscription",
+      subscription: paged.sub.id, metadata: { userId: paged.userId }
+    })
+  ]) {
+    await db.query("update users set current_period_end=null where id=$1", [paged.userId]);
+    assert.equal((await deliver(paidEvent)).statusCode, 200);
+    assert.ok((await status(paged)).cardPeriodEnd, "Paid line on page two grants access");
+  }
   const partial = await fixture();
   assert.equal((await deliver(event("charge.refunded", partial.charge), false)).statusCode, 400);
   assert.equal((await deliver(event("charge.refunded", partial.charge, true))).statusCode, 400);

@@ -2,6 +2,8 @@
 
 多用户 Markdown 笔记服务，提供 Web、HTTP API、CLI 和 MCP。每个用户使用独立 workspace，支持目录、编辑、搜索、Git 版本、ZIP 导入导出和固定版本分享。当前生产入口为 https://notes.bosschat.de。
 
+在自己的主机上搭建请从[自托管部署与 Stripe 沙箱验收](docs/self-hosting.md)开始。
+
 ## 当前生产部署
 
 Compose：`docker/compose.prod.yml`；环境：`.env.prod`；项目名：`notes-prod`；服务：`app`、`db`。API 为 `127.0.0.1:18081`，Web 为 `127.0.0.1:5173`，PostgreSQL 16 不发布主机端口。
@@ -26,7 +28,7 @@ curl -fsS http://127.0.0.1:18081/api/health
 | 凭据、外部地址、Stripe 配置 | `.env.prod` |
 | 镜像和数据库备份 | `backups/` |
 
-应用镜像为 `local/notes:home-guides-20261122`，数据库镜像由生产 Compose 固定，两者均为 `pull_policy: never`。恢复时，应用镜像从 `backups/home-guides-20261122T082619Z/release-image.tar.gz` 导入，数据库镜像从 `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` 导入，命令为 `gzip -dc <归档路径> | docker image load`。升级前执行一致性备份，再显式修改 Compose 的 `image`。
+应用镜像为 `local/notes:billing-selfhost-20261122`，数据库镜像由生产 Compose 固定，两者均为 `pull_policy: never`。恢复时，应用镜像从 `backups/billing-selfhost-20261122T084347Z/release-image.tar.gz` 导入，数据库镜像从 `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` 导入，命令为 `gzip -dc <归档路径> | docker image load`。升级前执行一致性备份，再显式修改 Compose 的 `image`。
 生产启动会执行数据库迁移，再启动 API/Web。Web 将 `/api/*` 和 `/mcp` 代理到 API，其他页面使用 SPA fallback。
 
 生产凭据只存 `.env.prod`；不要从 example 覆盖。`PROD_HOST_API_PORT=18081`、`PROD_HOST_WEB_PORT=5173`，`PUBLIC_BASE_URL=https://notes.bosschat.de`。Nginx 清单见 `/root/nginx/sites.json`，生成站点为 `/root/nginx/config/conf.d/notes.conf`。

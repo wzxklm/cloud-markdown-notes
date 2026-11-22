@@ -1,0 +1,17 @@
+name: notes-selfhost
+services:
+  app:
+    extends:
+      file: compose.prod.yml
+      service: app
+    image: ${NOTES_IMAGE:?Set NOTES_IMAGE to the published image digest or a local build}
+    pull_policy: missing
+    environment:
+      SITE_OPERATOR: ${SITE_OPERATOR:?Set SITE_OPERATOR}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:?Set SUPPORT_EMAIL}
+  db:
+    extends:
+      file: compose.prod.yml
+      service: db
+    image: postgres:16-alpine@sha256:e013e867e712fec275706a6c51c966f0bb0c93cfa8f51000f85a15f9865a28cb
+    pull_policy: missing

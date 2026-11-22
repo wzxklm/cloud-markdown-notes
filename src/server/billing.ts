@@ -35,6 +35,17 @@ type BillingRow = {
   subscription_canceled_at: Date | null;
 };
 
+async function paidPeriodEnd(stripe: Stripe, invoiceId: string, priceId: string) {
+  let end: number | undefined;
+  for await (const line of stripe.invoices.listLineItems(invoiceId, { limit: 100 })) {
+    const item = line.parent?.subscription_item_details;
+    if (item && !item.proration && line.pricing?.price_details?.price === priceId) {
+      end = Math.max(end ?? 0, line.period.end);
+    }
+  }
+  return end;
+}
+
 export function registerBillingRoutes(
   app: FastifyInstance,
   config: AppConfig,
@@ -114,6 +125,8 @@ export function registerBillingRoutes(
         } = await client.query<BillingRow>("select * from users where id = $1 for update", [
           user.id
         ]);
+        if (row.manual_access)
+          return { error: "Administrator access is already enabled; no paid subscription is needed." };
         const {
           rows: [wallet]
         } = await client.query("select * from wallets where user_id=$1", [user.id]);
@@ -294,16 +307,7 @@ export async function processBillingEvent(
       if (event.type === "invoice.paid" && invoice.status === "paid") {
         // Invoice line periods are paid entitlement, unlike a subscription's
         // current period which can advance while the renewal invoice is unpaid.
-        const lines = await stripe.invoices.listLineItems(invoice.id, { limit: 100 });
-        const ends = lines.data
-          .filter(
-            (line) =>
-              line.pricing?.price_details?.price === priceId &&
-              line.parent?.subscription_item_details &&
-              !line.parent.subscription_item_details.proration
-          )
-          .map((line) => line.period.end);
-        if (ends.length) paidEnd = Math.max(...ends);
+        paidEnd = await paidPeriodEnd(stripe, invoice.id, priceId);
       }
     } else subId = object.id;
     if (!subId) return;
@@ -327,15 +331,7 @@ export async function processBillingEvent(
     if (event.type.startsWith("checkout.session.")) {
       const invoice = sub.latest_invoice;
       if (invoice && typeof invoice !== "string" && invoice.status === "paid") {
-        const lines = await stripe.invoices.listLineItems(invoice.id, { limit: 100 });
-        const ends = lines.data
-          .filter(
-            (line) =>
-              line.pricing?.price_details?.price === priceId &&
-              !line.parent?.subscription_item_details?.proration
-          )
-          .map((line) => line.period.end);
-        if (ends.length) paidEnd = Math.max(...ends);
+        paidEnd = await paidPeriodEnd(stripe, invoice.id, priceId);
       }
     }
     await client.query(

@@ -408,7 +408,7 @@ export function BillingPage() {
                     Open workspace
                   </button>
                 )}
-                {!cardExists && (
+                {!cardExists && !data.manualAccess && (
                   <button
                     className="primary"
                     disabled={

@@ -102,6 +102,11 @@ async function checkout(
   });
 }
 try {
+  const manual = await register();
+  await db.query("update users set status='active', manual_access=true where id=$1", [manual.id]);
+  assert.equal((await checkout(manual, "card")).statusCode, 409);
+  assert.ok(!customers.has("notes-customer-" + manual.id));
+  assert.equal(checkoutCalls, 0);
   for (const first of ["card", "wallet"] as const) {
     const user = await register();
     const count = customers.size;

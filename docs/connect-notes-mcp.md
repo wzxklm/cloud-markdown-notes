@@ -4,13 +4,13 @@ Sign in to the Notes workspace, open **MCP keys**, enter a name for this client,
 
 ## Connect your client
 
-Choose **Streamable HTTP** and enter `https://notes.bosschat.de/mcp` as the server URL. In a **Bearer token** field, paste just the key. If your client takes HTTP headers, set `Authorization` to `Bearer ` followed by the key. This connection works independently of the Notes CLI.
+Choose **Streamable HTTP** and enter `https://notes.example.com/mcp` as the server URL. In a **Bearer token** field, paste just the key. If your client takes HTTP headers, set `Authorization` to `Bearer ` followed by the key. This connection works independently of the Notes CLI.
 
 For Codex, add the following entry to `~/.codex/config.toml` (on Windows, `%USERPROFILE%\.codex\config.toml`). If an entry named `cloud-notes` already exists, edit that entry. Replace the placeholder locally.
 
 ```toml
 [mcp_servers.cloud-notes]
-url = "https://notes.bosschat.de/mcp"
+url = "https://notes.example.com/mcp"
 http_headers = { Authorization = "Bearer YOUR_MCP_KEY" }
 ```
 

@@ -1,8 +1,12 @@
 import type { ReactNode } from "react";
 
+declare global {
+  interface Window { notesContact: { email: string; operator: string } }
+}
+
 export const legalContact = {
   service: "Notes",
-  email: "cowiejulewbfwo@gmail.com"
+  ...window.notesContact
 };
 
 const updated = "8 October 2026";
@@ -92,7 +96,7 @@ export function TermsPage() {
   return (
     <LegalLayout title="Terms of Service">
       <p>
-        Notes at notes.bosschat.de is operated by an independent individual developer. In these
+        Notes at {window.location.hostname} is operated by {legalContact.operator}. In these
         terms, “Notes”, “we” and “us” refer to this independently operated service. These terms
         govern your use of Notes. For questions about the service, {contactLink} by email. By
         registering or using Notes, you agree to these terms.
@@ -178,7 +182,7 @@ export function PrivacyPage() {
   return (
     <LegalLayout title="Privacy Policy">
       <p>
-        Notes is operated by an independent individual developer who is responsible for the personal
+        {legalContact.operator} is responsible for the personal
         data handled by the service as described below. For privacy questions and requests, use the{" "}
         <a href="/contact">Contact</a> page.
       </p>
@@ -363,8 +367,8 @@ export function ContactPage() {
   return (
     <LegalLayout title="Contact">
       <p>
-        Notes is a service operated and maintained by an independent individual developer. For
-        product support, account access, privacy questions or refund requests, contact the developer
+        Notes is operated and maintained by {legalContact.operator}. For
+        product support, account access, privacy questions or refund requests, contact the operator
         through the support email below:
       </p>
       <address>

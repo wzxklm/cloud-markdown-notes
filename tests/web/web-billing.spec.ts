@@ -66,6 +66,11 @@ test("billing displays scheduled cancellation, resumption and ended subscription
   await expect(page.getByText("Pending activation", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Subscribe · HKD 10/month" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open workspace" })).toHaveCount(0);
+  data.manualAccess = true;
+  data.active = true;
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(page.getByRole("button", { name: "Open workspace" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Subscribe · HKD 10/month" })).toHaveCount(0);
 });
 
 test("balance top-up, subscription controls and transaction history", async ({ page }) => {
