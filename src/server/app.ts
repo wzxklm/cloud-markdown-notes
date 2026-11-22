@@ -9,6 +9,7 @@ import { registerContentRoutes } from "./content";
 import { getDatabase, type Database } from "./db";
 import { registerExtensionRoutes } from "./extensions";
 import { registerVersionRoutes } from "./version";
+import { registerMcpKeyRoutes } from "./mcp-keys";
 import { registerMcpRoutes } from "./mcp";
 import type Stripe from "stripe";
 import { expirePaidAccess } from "./access";
@@ -69,6 +70,7 @@ export function buildApp(config: AppConfig, dependencies: AppDependencies = {}) 
   registerVersionRoutes(app, config, db);
   registerExtensionRoutes(app, config, db);
   registerMcpRoutes(app, config, db);
+  registerMcpKeyRoutes(app, config, db);
   void app.register(async (billingApp) => {
     await billingApp.register(rawBody, { field: "rawBody", global: false, encoding: "utf8", runFirst: true });
     registerBillingRoutes(billingApp, config, db, dependencies.stripe);

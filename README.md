@@ -1,620 +1,191 @@
 # Cloud Markdown Notes
 
-云端 Markdown 笔记系统，提供同一套笔记能力的 API、CLI、Web UI 和 MCP 四种入口。
+多用户 Markdown 笔记服务，提供 Web、HTTP API、CLI 和 MCP。每个用户使用独立 workspace，支持目录、编辑、搜索、Git 版本、ZIP 导入导出和固定版本分享。当前生产入口为 https://notes.bosschat.de。
 
-当前能力：
+## 当前生产部署
 
-- 用户注册、登录、退出、会话校验，以及管理员激活普通用户。
-- 每个用户独立 workspace，普通用户最多 1000 篇 `.md` 笔记，管理员不受该限制。
-- 文件夹和 Markdown 笔记的创建、读取、整篇替换、局部行编辑、移动、删除；空文件夹会通过 `.notes-meta/folders.json` 保留。
-- 笔记编辑使用 `fileVersion` 和 `ifMatch` 做并发冲突保护。
-- Git 风格版本管理：`status`、`diff`、`commit`、`history`、`show`、`discard`、`restore`。
-- Glob、Grep、Read 检索，仅面向工作区内的 Markdown 笔记和文件夹。
-- zip 导入、dry-run 冲突检查和 zip 导出。
-- 单篇已提交笔记公开分享；分享固定到发布时的 commit，取消发布或删除已提交文件后失效。
-- 独立 npm CLI 包：`cloud-markdown-notes`，包内只包含命令行客户端。
+Compose：`docker/compose.prod.yml`；环境：`.env.prod`；项目名：`notes-prod`；服务：`app`、`db`。API 为 `127.0.0.1:18081`，Web 为 `127.0.0.1:5173`，PostgreSQL 16 不发布主机端口。
 
-## 运行环境
-
-开发、测试和生产部署推荐使用 Docker 容器化环境。宿主机只需要：
-
-- Docker
-- Docker Compose
-
-只安装已发布 CLI 包时，Node.js 18+ 即可。
-
-## 环境变量
-
-开发环境使用仓库内的 `.env.dev`。
-
-常用变量：
-
-```text
-APP_ENV=development
-API_PORT=3000
-WEB_PORT=5173
-HOST_API_PORT=8080
-HOST_WEB_PORT=5173
-
-POSTGRES_USER=notes
-POSTGRES_PASSWORD=notes
-POSTGRES_DB=notes
-DATABASE_URL=postgres://notes:notes@db:5432/notes
-
-WORKSPACE_ROOT=/data/workspaces
-HOST_DATA_ROOT=./runtime/dev
-PUBLIC_BASE_URL=http://localhost:5173
-NOTES_API_URL=http://localhost:8080
-
-SESSION_SECRET=change-me
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=change-me
-```
-
-说明：
-
-- `API_PORT` 和 `WEB_PORT` 是容器内端口。
-- `HOST_API_PORT` 和 `HOST_WEB_PORT` 是开发环境暴露到宿主机的端口。
-- `WORKSPACE_ROOT` 是容器内 workspace 路径，宿主机数据落在 `HOST_DATA_ROOT`。
-- `PUBLIC_BASE_URL` 用于生成公开分享链接。
-- `NOTES_API_URL` 是 CLI 默认连接的服务端地址。
-
-应用进程的 dotenv 加载规则：
-
-- `APP_ENV=development` 或未设置 `APP_ENV` 时，默认读取 `.env.dev`，方便本地开发。
-- `APP_ENV=test` 和 `APP_ENV=production` 时，默认不读取 `.env.dev`，只使用 Docker Compose 或宿主环境已经注入的变量。
-- 如需显式指定 dotenv 文件，可设置 `DOTENV_CONFIG_PATH=/path/to/env-file`。
-
-生产环境参考 `.env.prod.example`：
+**所有生产命令必须保持下面的项目目录。** 它决定相对挂载路径，改为 `/root/notes` 可能连接一个新的空数据库。
 
 ```bash
-cp .env.prod.example .env.prod
+cd /root/notes
+dc=(docker compose --project-directory /root/notes/docker --env-file /root/notes/.env.prod -f /root/notes/docker/compose.prod.yml -p notes-prod)
+"${dc[@]}" config --quiet
+"${dc[@]}" up -d --wait --pull never
+"${dc[@]}" ps
+curl -fsS http://127.0.0.1:18081/api/health
 ```
 
-生产环境至少修改：
+同一 Bash 会话中，查看日志用 `"${dc[@]}" logs --tail 100`，停止用 `"${dc[@]}" stop -t 90`，恢复用 `"${dc[@]}" up -d --wait --pull never`，重启用 `"${dc[@]}" restart`。
 
-- `POSTGRES_PASSWORD`
-- `SESSION_SECRET`
-- `ADMIN_PASSWORD`
-- `PUBLIC_BASE_URL`
+| 数据 | 主机位置 |
+| --- | --- |
+| PostgreSQL | `docker/runtime/prod/postgres/` |
+| 用户笔记、Git 历史、目录元数据 | `docker/runtime/prod/workspaces/` |
+| 凭据、外部地址、Stripe 配置 | `.env.prod` |
+| 镜像和数据库备份 | `backups/` |
 
-生产端口和数据目录由以下变量控制：
+应用镜像为 `local/notes:mcp-tabs-20261122`，数据库镜像由生产 Compose 固定，两者均为 `pull_policy: never`。恢复时，应用镜像从 `backups/mcp-tabs-20261122T063410Z/release-image.tar.gz` 导入，数据库镜像从 `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` 导入，命令为 `gzip -dc <归档路径> | docker image load`。升级前执行一致性备份，再显式修改 Compose 的 `image`。
+生产启动会执行数据库迁移，再启动 API/Web。Web 将 `/api/*` 和 `/mcp` 代理到 API，其他页面使用 SPA fallback。
 
-```text
-PROD_HOST_API_PORT=8080
-PROD_HOST_WEB_PORT=5173
-PROD_HOST_DATA_ROOT=./runtime/prod
-```
+生产凭据只存 `.env.prod`；不要从 example 覆盖。`PROD_HOST_API_PORT=18081`、`PROD_HOST_WEB_PORT=5173`，`PUBLIC_BASE_URL=https://notes.bosschat.de`。Nginx 清单见 `/root/nginx/sites.json`，生成站点为 `/root/nginx/config/conf.d/notes.conf`。
 
-默认应用镜像是 `miketop/cloud-markdown-notes:latest`。如需固定版本或使用其他 Docker Hub 仓库，在 `.env.prod` 中修改：
+备份整个数据库、workspace 和配置的一致状态，不能仅保留 SQL 或 ZIP 导出。按 [主机备份恢复流程](../README.md#备份恢复与迁移) 使用上述 dc 数组；首次迁移的逻辑备份为 `backups/post-migration-20261005.dump`。公网迁移还需 Nginx、Cloudflare、证书工具和 UFW；不要覆盖目标已有 Nginx。
 
-```text
-NOTES_IMAGE=miketop/cloud-markdown-notes:0.3.1
-```
+## 开发与测试
 
-## 开发运行
+应用开发镜像基于 Node.js 24；源码挂载到 `/app`。主机编排 Compose，依赖、构建和测试在开发/测试容器内执行，不在生产容器执行。
 
-启动 Docker 开发服务：
+现有开发端口默认值会与生产冲突，且默认未限制绑定地址。使用以下命令覆盖为 localhost 的独立端口：
 
 ```bash
-docker compose --env-file .env.dev --project-directory . -f docker/compose.yml up -d app db
+cd /root/notes
+export HOST_API_PORT=127.0.0.1:18082 HOST_WEB_PORT=127.0.0.1:15173
+export HOST_DATA_ROOT=./runtime/dev
+dev=(docker compose --env-file .env.dev --project-directory /root/notes -f /root/notes/docker/compose.yml -p notes-dev)
+"${dev[@]}" config --quiet
+"${dev[@]}" up -d --build app db
+"${dev[@]}" exec app sh
+# 开发容器内 /app：
+npm run lint
+npm run build
+exit
+# 主机结束开发环境：
+"${dev[@]}" down
 ```
 
-默认访问：
+开发访问 `http://127.0.0.1:15173`，API 为 `http://127.0.0.1:18082/api`；通过 SSH 隧道访问，不直接公开开发端口。开发数据为 `runtime/dev/`，与生产 `docker/runtime/prod/` 分离；`.env.dev` 不得填生产凭据。现有 `app_node_modules` 命名卷仅为可重建依赖缓存，不存业务数据。
 
-- API: `http://localhost:8080/api`
-- Web UI: `http://localhost:5173`
-
-查看日志：
+完整测试从**主机**启动，不需要给开发容器挂载 Docker socket：
 
 ```bash
-docker compose --env-file .env.dev --project-directory . -f docker/compose.yml logs -f app
-```
-
-停止服务：
-
-```bash
-docker compose --env-file .env.dev --project-directory . -f docker/compose.yml down
-```
-
-开发 Compose 项目名固定为 `notes-dev`，避免和测试、生产容器互相覆盖。
-
-需要执行工程命令时，在开发容器内运行：
-
-```bash
-docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app npm run migrate
-docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app npm run lint
-docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app npm run build
-```
-
-构建产物：
-
-- `dist/`：Vite 前端静态资源。
-- `dist-node/`：API、迁移脚本和生产 Web 静态服务的 Node 构建产物。
-- `packages/cli/dist/index.js`：发布 CLI 包时生成的命令行入口。
-
-## 端到端测试
-
-Docker 测试入口：
-
-```bash
+cd /root/notes
 sh tests/run-e2e.sh
 ```
 
-`tests/run-e2e.sh` 会启动 Docker 测试环境，然后在 `app` 容器内运行 `tests/full-test-runner.ts`。总入口会依次执行：
+`npm test` 调用同一 Docker 编排脚本，不能在无 Docker 的普通开发容器中直接运行。测试使用 `notes-test`，不发布端口，数据和报告位于 `runtime/fulltest-docker/`；测试开始会清理其数据库及 workspace，禁止改指生产数据。
 
-1. `tests/api/full-test.ts`
-2. `tests/cli/full-test.ts`
-3. `playwright test`
+容器内总入口 `tests/full-test-runner.ts` 依次执行计费状态回归、API、CLI、MCP 和 Playwright 测试。CLI 测试打包并安装真实 npm 产物；失败时保留日志和报告。功能清单见 [可测试功能](docs/可测试功能.md)，维护规则见 [AGENTS.md](AGENTS.md)。清单是测试要求，不是最新一轮通过记录。
 
-测试会走真实 HTTP、真实 CLI、真实浏览器、真实 PostgreSQL 和真实 workspace。测试开始前会清空测试数据库和测试 workspace，结束后也会清理测试数据。
+## API、CLI 与 MCP
 
-全功能测试覆盖清单维护在 `docs/可测试功能.md`。新增或修改功能后，先更新该清单，再同步更新 API、CLI、Web 和 MCP 测试脚本。
+JSON API 成功返回 `{ "data": ... }`，失败返回 `{ "error": { "code": ..., "message": ... } }`；ZIP 导出是二进制。认证使用 `Authorization: Bearer <会话token>`。
 
-测试环境使用独立运行时目录：
+| 功能 | API 入口 |
+| --- | --- |
+| 健康、登录、当前账号 | `/api/health`、`/api/auth/login`、`/api/auth/me` |
+| 注册、退出、管理员 | `/api/auth/register`、`/api/auth/logout`、`/api/admin/users/*` |
+| 文件夹和笔记 | `/api/folders`、`/api/tree`、`/api/notes`，移动用相应 `/move` |
+| 版本管理 | `/api/version/status`、`diff`、`commit`、`history`、`show`、`discard`、`restore` |
+| 检索 | `/api/search/glob`、`grep`、`read` |
+| 导入导出 | `/api/import/dry-run`、`/api/import`、`/api/export.zip` |
+| 分享 | `/api/shares`、`/api/shares/public/:slug`；页面 `/s/:slug` |
 
-```text
-runtime/fulltest-docker/postgres
-runtime/fulltest-docker/workspaces
-runtime/fulltest-docker/runner
-runtime/fulltest-docker/playwright-report
-runtime/fulltest-docker/test-results
-runtime/fulltest-docker/full-test-runner.log
-runtime/fulltest-docker/compose.log
+完整方法和断言见 [功能清单](docs/可测试功能.md)。替换/局部编辑前读取 `fileVersion` 并作为 `ifMatch` 提交；局部编辑行号从 1 开始、两端包含，空内容删除指定行。`EDIT_CONFLICT` 时重读后重试，不覆盖新版本。
+分享仅发布已提交且工作区干净的笔记，内容固定到该 commit；ZIP 导出不包含完整数据库或 Git 历史，不能替代备份。
+
+CLI 只要求客户端 Node.js 18+，不要求安装服务端。安装和命令示例见 [CLI README](packages/cli/README.md)。在开发容器可直接运行 `notes help`；访问生产必须显式使用 `https://notes.bosschat.de`，不要把 CLI 默认 localhost:8080 当作本机生产 Notes。
+
+仓库提供 [cloud-notes-cli skill](docs/skills/cloud-notes-cli/SKILL.md)，可按客户端的技能安装方式使用；技能本身不包含 CLI。无需为了 VPS 维护在主机全局安装或自动更新 npm 包。
+
+### 创建个人 MCP 密钥
+
+1. 登录 Notes，进入工作区的 **MCP keys**，给设备起名，点击 **Create MCP key**。复制只在创建时显示的密钥。
+2. 在 Windows、macOS 或 Linux 的 MCP 客户端选择 Streamable HTTP，地址填写 `https://notes.bosschat.de/mcp`，将密钥粘贴到 Bearer token 栏，无需安装 Notes CLI。
+3. 在 Codex 中也可编辑用户的 `~/.codex/config.toml`（Windows 为 `%USERPROFILE%\.codex\config.toml`），添加或替换同名配置后重新加载 MCP：
+
+```toml
+[mcp_servers.cloud-notes]
+url = "https://notes.bosschat.de/mcp"
+http_headers = { Authorization = "Bearer YOUR_MCP_KEY" }
 ```
 
-失败时会保留完整测试 runner 日志、Playwright 报告、测试结果和 Compose 日志，便于排查；该环境不污染 `runtime/dev` 和 `runtime/prod`。
+密钥允许 MCP 工具读写本人工作区，包括版本、导入和分享。使用 HTTPS，并限制本地配置文件的读取权限。每个客户端可使用独立密钥；丢失密钥时在 **MCP keys** 撤销并重新创建。密钥持续有效直至撤销，账号失去工作区访问权限时也无法调用工具。已有工作区会话 Bearer 令牌仍可使用。数据库迁移 `0009_mcp_keys.sql` 新增个人密钥表，保存摘要和管理信息。
 
-测试 Compose 项目名固定为 `notes-test`，不会复用开发或生产容器。
+## 账户、订阅与页面
 
-手动清理测试环境：
+Web 注册需要邮箱，新用户为 pending；API 允许省略 email，提供时校验格式。管理员激活或有效付费可以授予工作区访问，pending 的计费会话不能当工作区会话使用。
+
+当前代码的 Stripe 方案为 HKD 10/月；服务端配置 `STRIPE_SECRET_KEY`、`STRIPE_PRICE_ID`、`STRIPE_WEBHOOK_SECRET`。Price 必须满足代码校验，Checkout 使用 Managed Payments 与 `2026-02-25.preview` API。修改支付流程前核对 `src/server/billing.ts`，不凭旧文档直接升级 API。
+
+Webhook 地址为 `https://notes.bosschat.de/api/billing/webhook`，处理 `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`invoice.paid`、`invoice.payment_failed`、`customer.subscription.updated`、`customer.subscription.deleted` 以及下文列出的充值、退款和争议事件。访问期限依据 webhook 确认的已付款期限，状态查询和取消操作不自行延长权限。
+
+公开页面为 `/`、`/login`、`/register`、`/billing`、`/terms`、`/privacy`、`/refunds`、`/contact`。法律和联系文案在 Web 源码中维护，不在运维文档重复一份；人工退款/隐私处理不等于已有自动退款或自动删除能力。
+
+## 构建与发布
+
+业务修改先在隔离开发环境验证。生产构建使用 `docker/Dockerfile` 的 `production` 阶段，在主机获得部署授权后执行；选定新镜像标签，再修改实际生产 Compose 的 image，不能依赖已失效的 NOTES_IMAGE 覆盖。
+
+CLI 包位于 `packages/cli`，版本和 Node 要求以 package.json 为准。在开发容器执行 `npm --prefix packages/cli pack --dry-run`，prepack 会构建 `dist/index.js`；只有明确要求发布时才执行 npm publish。Docker 镜像发布工作流位于 `.github/workflows/docker-publish.yml`，涉及外部发布时先核对触发规则和目标仓库，不以推送文档代替部署。
+
+## 余额充值
+
+余额功能部署于 https://notes.bosschat.de，使用 Stripe Live mode；原 card 订阅继续可用。公开测试站点已退役，开发与自动化测试按上面的隔离容器流程重新创建，禁止使用生产凭据。
+
+### Stripe 与业务规则
+
+- 保留 card 的 HKD 10/月 Managed Payments 订阅；充值用普通 Checkout `mode=payment`，不启用 Managed Payments、税费附加、折扣或自动货币转换；支付与入账金额均为 HKD。
+- 充值档位 HKD 10/30/100，自定义 HKD 10–1000 整数。余额不失效、不可转账或提现。充值本身不开通订阅，用户显式开启余额续费。
+- 余额订阅每个 UTC 日历月扣 1000 港分；月底截断但保留原始日锚点。取消续费保留已付款权限；不足则到期停用，充值后为仍启用续费的用户从恢复时刻开始新周期。长时间停机不追扣历史月份；定时任务正常调度延迟不超过两分钟时沿用原周期。
+- card 与余额续费互斥；切换必须等待旧订阅终止和已付费期限结束。启用余额会关闭尚未完成的 card Checkout；不自动取消有效 card 订阅。
+- 卡订阅与充值共享一致的客户创建幂等参数，邮箱单独同步；首请求失败后可切换支付方式重试。卡订阅检查遍历所有分页，避免漏掉仍有效的订阅。
+- PostgreSQL 保存订单、余额和流水。Stripe 验签、环境/币种/金额/产品/用户核验通过后才入账；重复或乱序事件不重复充值或扣款。
+- 首次卡订阅付款支持 7 个自然日内申请全额无理由退款，以申请发送时间为准，每位客户仅一次；续费、重复注册及余额订阅扣款不适用。余额订阅首次及续费扣款不退款，只有未消费充值余额可申请人工原路退款，审核金额不得超过可用余额及原订单可退金额。适用法律及 Stripe/Link 规则要求的权利不受影响。
+- 人工在 Stripe 原路退款；成功退款与争议资金撤回/返还驱动账本冲正。同一充值的退款和争议合计冲正不超过充值额。负余额阻止余额续费，已购买期限保留，不提供自助退款或提现接口。
+- 卡订阅退款：`charge.refunded` / `refund.updated` 经 Stripe 查询确认任意金额成功退款后，撤销原订阅权限并立即取消该 Stripe 订阅。待处理/失败退款不撤权；历史订阅退款不影响替代订阅、余额订阅或管理员授权。退款记录持久化到 `refunded_card_subscriptions`，阻止晚到的付款事件重新开通；取消失败返回非 2xx，由 Stripe 重试，期间本地权限保持撤销。取消不额外生成账单或按比例退款。
+- 正式 webhook：`https://notes.bosschat.de/api/billing/webhook`；当前快照事件版本 `2026-08-26.dahlia`。应用 Stripe 调用仍采用既有 `2026-02-25.preview`，没有升级生产 API 版本。
+- 在原六类事件基础上增加 `checkout.session.async_payment_failed`、`checkout.session.expired`、`charge.refunded`、`refund.updated`、`charge.dispute.funds_withdrawn`、`charge.dispute.funds_reinstated`。Webhook 失败返回非 2xx，待 Stripe 重投；不要手工给订单加余额。
+
+配置项（实际密钥只保存在私密环境文件）：
+
+| 变量 | 用途 |
+| --- | --- |
+| STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET | 对应环境的 API/签名密钥 |
+| STRIPE_PRICE_ID | HKD 10/月 card Price |
+| STRIPE_TOPUP_PRODUCT_ID | 充值 Product |
+| STRIPE_TOPUP_PRICE_10 / _30 / _100 | 三个一次性 Price，可省略后由同一 Product 动态定价 |
+| STRIPE_LIVEMODE | 测试固定 false；正式必须 true |
+| PUBLIC_BASE_URL | 与站点一致，正式为 https://notes.bosschat.de |
+
+### 余额 API
+
+所有用户接口接受 billing 或 workspace 会话，金额为整数港分；沿用 `{data}` / `{error}` 响应。
+
+| 方法与路径 | 行为 |
+| --- | --- |
+| GET /api/billing/status | 增加 wallet（balance/currency/autoRenew/periodEnd/enabled）、cardPeriodEnd；currentPeriodEnd 为两种来源的有效已付费截止时间 |
+| POST /api/billing/topups/checkout-session | body: amount（1000–100000 且为100倍数）、requestId（UUID）；返回 url、orderId；网络重试必须复用 requestId |
+| GET /api/billing/topups/:id | 仅本人订单，返回 pending/paid/failed/expired 及退款/冲正金额 |
+| GET /api/billing/wallet/transactions?before= | 每页20条，nextCursor 分页，按数值流水ID倒序 |
+| POST /api/billing/wallet/subscription | 开启或恢复余额续费，首次扣款后开通 |
+| DELETE /api/billing/wallet/subscription | 取消未来续费，保留已付费期限 |
+
+### 备份与升级回退
+
+本次升级备份为 `backups/wallet-production-20261008/`：`images.tar.gz` 保存升级前后应用和数据库镜像，`database.dump` 为停写后的逻辑备份，`data.tar.gz` 为数据库干净停机后的原始数据及 workspace，另有升级前生产环境和 Compose 配置。目录权限 700，文件 600；禁止入库或公开。长期备份按主机通用流程执行。
+
+迁移 `0007_wallet.sql` 新增余额表；`0008_card_subscription_refunds.sql` 新增卡订阅退款撤权记录表，均不修改既有用户权限，不追溯触发历史退款。生产构建及部署：
 
 ```bash
-docker compose --env-file .env.dev --project-directory . -f docker/compose.yml -f docker/compose.test.yml down
-rm -rf runtime/fulltest-docker
+cd /root/notes
+docker build --target production -f docker/Dockerfile -t local/notes:billing-audit-20261008 .
+prod=(docker compose --project-directory /root/notes/docker --env-file /root/notes/.env.prod -f /root/notes/docker/compose.prod.yml -p notes-prod)
+"${prod[@]}" config --quiet
+"${prod[@]}" up -d --wait --pull never
+curl -fsS http://127.0.0.1:18081/api/health
 ```
 
-## 部署
+当前计费审查修复版镜像、升级前数据库和 workspace 备份位于 `backups/billing-audit-production-20261008/`。使用 `gzip -dc backups/billing-audit-production-20261008/image.tar.gz | docker image load` 恢复镜像；本次无数据库迁移，回退镜像仍保留卡退款撤权功能。
 
-生产部署只需要 Docker Compose 配置和环境变量文件，不需要克隆源码、安装 Node.js 依赖或在服务器上构建前端。
+首次卡订阅 7 天退款条款版镜像为 `backups/image-first-card-refund-20261008.tar.gz`；恢复命令为 `gzip -dc backups/image-first-card-refund-20261008.tar.gz | docker image load`。此版仅修改公开条款和页面提示，不增加数据库迁移。
 
-在服务器上创建部署目录并下载两个文件：
+卡退款自动撤权版的升级前数据库、workspace 和配置备份在 `backups/card-refunds-production-20261008/`；该目录的 `image.tar.gz` 为卡退款自动撤权版镜像，可用 `gzip -dc backups/card-refunds-production-20261008/image.tar.gz | docker image load` 恢复。
 
-```bash
-mkdir -p cloud-markdown-notes
-cd cloud-markdown-notes
-curl -fsSL https://raw.githubusercontent.com/wzxklm/cloud-markdown-notes/main/docker/compose.prod.yml -o compose.yml
-curl -fsSL https://raw.githubusercontent.com/wzxklm/cloud-markdown-notes/main/.env.prod.example -o .env.prod
-```
+退款条款文案版镜像另存于 `backups/image-refund-policy-20261008.tar.gz`，可用 `gzip -dc backups/image-refund-policy-20261008.tar.gz | docker image load` 恢复。此版仅更新前端条款及提示，不含数据迁移。
 
-编辑 `.env.prod`，至少修改 `POSTGRES_PASSWORD`、`SESSION_SECRET`、`ADMIN_PASSWORD` 和 `PUBLIC_BASE_URL`。然后拉取镜像并启动：
+后续升级使用新的唯一镜像标签，先一致备份再显式修改 Compose。数据恢复前停止 app/db，另存当前数据；将 `data.tar.gz` 解压到空恢复目录，保留 UID/GID，核对后替换对应 `docker/runtime/prod/`。逻辑恢复使用 `pg_restore` 导入空数据库，不覆盖仍在写入的数据库。缺少本地镜像时执行 `gzip -dc backups/wallet-production-20261008/images.tar.gz | docker image load`。
 
-```bash
-docker compose --env-file .env.prod pull
-docker compose --env-file .env.prod up -d
-```
+产生余额业务数据后，旧镜像不识别余额权限，不能直接回滚后继续收款。回退前暂停充值入口，停止新写入并备份新增账本；保留新增表及流水，禁止通过删除表或恢复旧库丢弃付款记录。确认没有新增付款时，可将备份的 `compose.prod.before.yml` 和 `env.prod.before` 恢复到原路径，再执行上述生产启动命令；已有付款时优先修复或按账本核对后处理。
 
-Compose 会拉取 `NOTES_IMAGE` 指定的应用镜像和 PostgreSQL 镜像，等待数据库健康后运行迁移并启动 API 与 Web 服务。默认数据保存在部署目录的 `runtime/prod` 中。
-
-应用和数据库容器使用 `restart: always`，进程退出、Docker daemon 重启或宿主机重启后会自动恢复运行。
-
-需要在仓库内从当前源码构建生产镜像时，可执行：
-
-```bash
-docker build --target production -t cloud-markdown-notes:local -f docker/Dockerfile .
-NOTES_IMAGE=cloud-markdown-notes:local docker compose --env-file .env.prod --project-directory . -f docker/compose.prod.yml up -d
-```
-
-生产容器启动时会先运行迁移，再同时启动：
-
-- API 服务：`dist-node/src/server/index.js`
-- Web 静态服务：`dist-node/scripts/serve-web.js`
-
-生产 Web 服务会代理 `/api/*` 到同容器 API，并对其他路径提供 SPA fallback，因此 `/s/:slug` 公开分享页可直接访问。
-
-查看日志：
-
-```bash
-docker compose --env-file .env.prod logs -f app
-```
-
-停止：
-
-```bash
-docker compose --env-file .env.prod down
-```
-
-生产 Compose 项目名固定为 `notes-prod`，不会被开发或测试环境的 `down` 清理。
-
-### 更新生产容器
-
-在部署目录执行：
-
-```bash
-docker compose --env-file .env.prod pull app
-docker compose --env-file .env.prod up -d app db
-```
-
-更新后检查容器和 API 健康状态：
-
-```bash
-docker compose --env-file .env.prod ps
-curl -fsS http://127.0.0.1:8080/api/health
-```
-
-如果修改了 `PROD_HOST_API_PORT`，健康检查命令中的 `8080` 也应替换为对应端口。
-
-### 发布 Docker Hub 镜像
-
-GitHub Actions 工作流 `.github/workflows/docker-publish.yml` 会构建 Dockerfile 的 `production` 阶段，并发布 `linux/amd64`、`linux/arm64` 多架构镜像。
-
-首次使用前，在 GitHub 仓库的 Actions secrets 中配置：
-
-- `DOCKERHUB_USERNAME`：Docker Hub 用户名。
-- `DOCKERHUB_TOKEN`：具有目标仓库读写权限的 Docker Hub access token。
-
-镜像默认发布到 `miketop/cloud-markdown-notes`。仓库名不同时，在 GitHub Actions repository variables 中设置 `DOCKERHUB_IMAGE`，值为完整的 `<namespace>/<repository>`。
-
-发布规则：
-
-- 推送到 `main` 且生产镜像输入发生变化：更新 `latest`。镜像输入包括服务端、Web、共享代码、生产脚本、依赖文件、构建配置和 Dockerfile；只修改文档、测试或 Compose 不会触发构建。
-- 推送 `v0.3.1` 这类 Git 标签：发布 `0.3.1` 版本标签，不更新 `latest`。
-- 在 GitHub Actions 页面从默认分支手动运行：更新 `latest`。
-
-生产环境使用 `miketop/cloud-markdown-notes:latest`，更新前执行 `docker compose pull app` 获取最新镜像。
-
-## API 使用
-
-API 成功响应统一包在 `data` 字段：
-
-```json
-{ "data": {} }
-```
-
-错误响应：
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Required input is missing or invalid."
-  }
-}
-```
-
-登录获取 token：
-
-```bash
-curl -s http://localhost:8080/api/auth/login \
-  -H 'content-type: application/json' \
-  -d '{"username":"admin","password":"change-me"}'
-```
-
-后续请求带 Bearer token：
-
-```bash
-TOKEN=...
-curl -s http://localhost:8080/api/auth/me \
-  -H "authorization: Bearer $TOKEN"
-```
-
-常用 API：
-
-```text
-GET    /api/health
-
-POST   /api/auth/register
-POST   /api/auth/login
-POST   /api/auth/logout
-GET    /api/auth/me
-GET    /api/admin/users/pending
-POST   /api/admin/users/:userId/activate
-
-POST   /api/folders
-GET    /api/folders?path=/docs
-PATCH  /api/folders/move
-DELETE /api/folders?path=/docs
-GET    /api/tree
-
-POST   /api/notes
-GET    /api/notes?path=/docs/a.md
-PUT    /api/notes?path=/docs/a.md
-PATCH  /api/notes?path=/docs/a.md
-PATCH  /api/notes/move
-DELETE /api/notes?path=/docs/a.md
-
-GET    /api/version/status
-GET    /api/version/diff
-POST   /api/version/commit
-GET    /api/version/history
-GET    /api/version/show?commit=<sha>
-POST   /api/version/discard
-POST   /api/version/restore
-
-POST   /api/search/glob
-POST   /api/search/grep
-GET    /api/search/read?path=/docs/a.md&offset=1&limit=20
-
-GET    /api/export.zip
-POST   /api/import/dry-run
-POST   /api/import
-
-POST   /api/shares
-GET    /api/shares
-DELETE /api/shares/:shareId
-GET    /api/shares/public/:slug
-GET    /s/:slug
-```
-
-创建文件夹和笔记：
-
-```bash
-curl -s http://localhost:8080/api/folders \
-  -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"path":"/docs"}'
-
-curl -s http://localhost:8080/api/notes \
-  -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"path":"/docs/a.md","content":"# A\n"}'
-```
-
-编辑笔记需要先读取当前 `fileVersion`，再通过 `ifMatch` 提交：
-
-```bash
-curl -s 'http://localhost:8080/api/notes?path=/docs/a.md' \
-  -H "authorization: Bearer $TOKEN"
-
-curl -s 'http://localhost:8080/api/notes?path=/docs/a.md' \
-  -X PUT \
-  -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"content":"# B\n","ifMatch":"<fileVersion>"}'
-
-curl -s 'http://localhost:8080/api/notes?path=/docs/a.md' \
-  -X PATCH \
-  -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"ifMatch":"<fileVersion>","fromLine":2,"toLine":3,"content":"替换内容"}'
-```
-
-`PATCH /api/notes` 使用从 1 开始的闭区间行号，`content` 可以是多行；`content:""` 表示删除该行范围。
-
-提交变更：
-
-```bash
-curl -s http://localhost:8080/api/version/commit \
-  -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"message":"initial notes"}'
-```
-
-## CLI 使用
-
-已启动开发容器后运行真实 CLI：
-
-```bash
-docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app notes health
-```
-
-CLI 已发布到 npm，可直接安装：
-
-```bash
-npm install -g cloud-markdown-notes
-notes config set-api-url https://notes.example.com
-notes auth login alice alice-password
-notes health
-```
-
-### Codex skill 配套使用
-
-仓库同时提供了 `cloud-notes-cli` skill，文件位于
-`docs/skills/cloud-notes-cli/SKILL.md`。将该目录安装到 Codex 的个人
-skills 目录后，Codex 就可以按照 skill 中的流程安装、配置并调用
-`notes` CLI：
-
-```bash
-mkdir -p ~/.codex/skills
-cp -R docs/skills/cloud-notes-cli ~/.codex/skills/
-```
-
-重新启动 Codex 后，可以直接让它执行 Cloud Markdown Notes 的 CLI
-操作。该 skill 会指导 Codex 运行 `npm install -g cloud-markdown-notes@latest`
-并使用 `notes ...` 命令；它本身不包含 CLI 程序，因此主机仍需安装
-Node.js 18+ 和 npm。没有 Node.js/npm 时，请改为在开发容器中运行：
-
-```bash
-docker compose --env-file .env.dev --project-directory . \
-  -f docker/compose.yml exec app notes health
-```
-
-也可以单次通过 `--api-url` 指定服务端地址：
-
-```bash
-notes --api-url https://notes.example.com auth login alice alice-password
-```
-
-CLI 配置默认保存在 `~/.config/cloud-markdown-notes/config.json`，可通过 `NOTES_CONFIG_PATH` 指定其他路径。登录成功后会保存当前 API URL 和会话 token。
-
-API URL 生效优先级：
-
-1. `--api-url`
-2. `NOTES_API_URL`
-3. 配置文件
-4. 默认 `http://localhost:8080`
-
-Token 生效优先级：
-
-1. `--token`
-2. `NOTES_TOKEN`
-3. 配置文件
-
-常用命令：
-
-```bash
-notes health
-notes config get
-notes config set-api-url http://localhost:8080
-
-notes auth register alice alice-password
-notes auth login admin change-me
-notes auth me
-notes auth logout
-
-notes admin pending-users
-notes admin activate <user-id>
-
-notes folder mkdir /docs
-notes folder ls /docs
-notes folder mv /docs /archive/docs
-notes folder rm /archive/docs
-notes tree
-
-notes note create /docs/a.md <<'MARKDOWN'
-# A
-MARKDOWN
-notes note create /docs/b.md < local.md
-notes note read /docs/a.md
-notes note replace /docs/a.md < local.md
-notes note edit /docs/a.md --from-line 10 --to-line 12 <<'MARKDOWN'
-替换内容
-MARKDOWN
-notes note edit /docs/a.md --from-line 10 --to-line 12 < /dev/null
-notes note mv /docs/a.md /docs/c.md
-notes note rm /docs/c.md
-
-notes status
-notes diff
-notes commit -m "save notes"
-notes history
-notes show <sha>
-notes discard
-notes restore --commit <sha> --path /docs/a.md --type file
-
-notes search glob "**/*.md"
-notes search grep "todo" --ignore-case --glob "docs/**/*.md"
-notes search read /docs/a.md --offset 1 --limit 20
-
-notes search grep "目标内容" --json
-notes search read /docs/a.md --offset 20 --limit 20 --json
-notes note edit /docs/a.md --from-line 27 --to-line 31 <<'MARKDOWN'
-新内容
-MARKDOWN
-
-notes export -o notes.zip
-notes import notes.zip --dry-run
-notes import notes.zip
-
-notes share publish /docs/a.md
-notes share list
-notes share unpublish <share-id>
-```
-
-`note create`、`note replace` 和 `note edit` 的 Markdown 正文只从标准输入读取。可以使用 `< local.md`、管道或带引号的 heredoc（`<<'MARKDOWN'`）传入内容，正文不会进入命令行参数，也不会被 shell 展开。空的标准输入表示空正文；用于 `note edit` 时会删除指定行范围。
-
-版本管理命令返回的状态和 patch diff 会保留非 ASCII 路径的原始文件名。
-
-所有命令都支持 `--json` 输出脚本友好的 JSON：
-
-```bash
-notes status --json
-```
-
-### CLI 包维护
-
-CLI 对外发布包位于 `packages/cli`，npm 包名是 `cloud-markdown-notes`，当前可通过 `npm install -g cloud-markdown-notes` 直接安装。
-
-维护者发布新版本前，先运行 Docker 完整测试，再在开发容器内检查包内容：
-
-```bash
-sh tests/run-e2e.sh
-docker compose --env-file .env.dev --project-directory . -f docker/compose.yml exec app sh -lc 'cd packages/cli && npm pack --dry-run'
-```
-
-`packages/cli/package.json` 的 `bin.notes` 指向 `dist/index.js`。执行 `npm pack` 或 `npm publish` 时，`prepack` 会回到仓库根目录执行 `npm run build:cli`，把 `src/cli/index.ts` 构建进 CLI 包。
-
-完整测试中的 CLI 流程会先执行 `npm pack`，再把生成的包安装到临时目录，并使用安装后的 `notes` 命令跑端到端用例。
-
-CLI 包没有运行时 npm 依赖。用户安装 `cloud-markdown-notes` 时只会安装 CLI 客户端，不会安装 API、PostgreSQL、React 或 Web UI 相关依赖。
-
-确认 dry-run 包内容无误后，在 `packages/cli` 目录发布：
-
-```bash
-npm publish --access public
-```
-
-发布后在需要使用 CLI 的主机上更新全局安装：
-
-```bash
-npm install -g cloud-markdown-notes@latest
-npm list -g cloud-markdown-notes --depth=0
-notes --api-url http://127.0.0.1:8080 health --json
-```
-
-## Web UI 使用
-
-启动服务后访问：
-
-```text
-http://localhost:5173
-```
-
-基本流程：
-
-1. 使用管理员账号登录。
-2. 普通用户注册后，管理员在 `admin` 页签中加载待激活用户并激活。
-3. 普通用户登录后，在左侧工作区树创建文件夹和笔记。
-4. 中间区域编辑 Markdown，右侧使用 GFM Markdown 渲染实时预览；保存时使用 `fileVersion` 防止覆盖服务器上的新版本。
-5. `version` 页签查看 status、diff、提交历史、历史提交详情、恢复路径和丢弃未提交变更。
-6. `search` 页签使用 Glob、Grep、Read。
-7. `transfer` 页签导出 zip，或选择 zip 做 dry-run 与正式导入。
-8. `shares` 页签发布当前已提交笔记并生成公开链接，取消发布后链接失效。
-
-桌面端工作区固定为浏览器视口高度，目录、Markdown 编辑器、预览和工具管理面板分别独立滚动；窄屏设备使用纵向页面布局。
-
-公开分享页面路径：
-
-```text
-/s/:slug
-```
-
-分享只展示发布时 commit 中的内容，未提交草稿不会公开。
-
-## MCP 使用
-
-服务启动后提供 Streamable HTTP MCP 端点：`POST /mcp`。客户端请求必须携带现有 API 会话 token：`Authorization: Bearer <token>`。支持工作区、Markdown 笔记、搜索、版本、导入和分享工具。先在 CLI 中登录获取 token：
-
-```bash
-notes auth login alice alice-password
-export NOTES_TOKEN="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.HOME+"/.config/cloud-markdown-notes/config.json")).token)')"
-```
-
-Codex 配置（Codex CLI）:
-
-```bash
-codex mcp add cloud-notes --url https://notes.example.com/mcp --bearer-token-env-var NOTES_TOKEN
-```
-
-Claude Code 配置：
-
-```bash
-claude mcp add --transport http cloud-notes https://notes.example.com/mcp --header "Authorization: Bearer $NOTES_TOKEN"
-```
-
-本地生产服务将 URL 替换为 `http://localhost:8080/mcp`。配置完成后，在对应客户端中调用 `tools/list` 或直接让模型读取、编辑和搜索笔记。
-# Stripe 订阅
-
-首页提供 HKD 10/月订阅。请在 Stripe Dashboard 创建月度 HKD Price，并配置 `STRIPE_SECRET_KEY`、`STRIPE_PRICE_ID` 和 `STRIPE_WEBHOOK_SECRET`。Webhook 地址为 `/api/billing/webhook`。
-
-公开网站页脚提供 `/terms` 服务条款、`/privacy` 隐私政策、`/refunds` 退款政策和 `/contact` 联系方式。产品与账户支持邮箱为 `cowiejulewbfwo@gmail.com`；Stripe/Link 交易支持也可从支付收据进入。取消订阅不会自动退款，具体退款申请按页面列出的 Stripe Managed Payments 规则及适用法律处理。
-
-Stripe 配置步骤：在 Dashboard 开通 Managed Payments，创建激活的 HKD 10 monthly recurring Price，将 Price ID 写入 `STRIPE_PRICE_ID`，并把 `checkout.session.completed`、`checkout.session.async_payment_succeeded`、`invoice.paid`、`invoice.payment_failed`、`customer.subscription.updated` 和 `customer.subscription.deleted` 投递到 webhook 地址。应用使用 blueprint 要求的 `2026-02-25.preview` Checkout API 版本，并校验 Price 必须为 HKD 10/月。匿名用户访问 `/` 查看介绍和定价；`/login`、`/register` 用于认证；注册后从 `/billing` 开始支付。Stripe 的 secret 和 webhook secret 只配置在服务端环境变量，不要提交到仓库。
-
-登录、注册和订阅页也提供法律与联系页脚；注册和订阅操作前的政策链接在新标签页打开，保留当前表单。四个公开页面无需登录，支持直接访问和刷新。
-
-Notes（`notes.bosschat.de`）由独立个人开发者运营，对外使用上述客服邮箱，不列出公司主体信息。退款政策：首次订阅付款后 7 个自然日内可申请全额退款；续费通常不退、取消通常不按未使用天数退款，但重复或错误扣款、付款后未开通和无法解决的重大服务故障可申请全额或相应比例退款。邮件目标回复时限为 3 个工作日，资料齐全后目标审核时限为 5 个工作日；支付方发起退款后通常 5–10 个工作日到账，具体以银行和支付方为准。退款申请不会自动取消续费。适用法律及 Stripe/Link 更有利的退款权利不受限制。退款与隐私请求通过邮件人工处理，这些文案时限不代表系统已实现自动退款或自动删除账户。页面存在不代表已通过支付平台审核。
-
-订阅状态页读取 webhook 确认的已付款期限和取消状态，不通过 Stripe 的账期直接延长访问权限。`npm test` 同时执行 `tests/api/billing-status-test.ts`，覆盖状态查询、两种取消方式、撤销取消、已付款期限及到期限制。订阅页同时识别 Stripe 的周期末取消和指定时间取消（`cancel_at`），显示“不再续费”；已取消的订阅也不再显示自动续费。指定取消时间通过状态接口的 `cancelAt` 返回，与已付款使用截止时间分别展示。
-
-从源码部署时，Docker 构建上下文排除各级 `runtime` 目录和 `.env.prod`。更新既有部署前核对容器实际数据挂载；Compose 的 `--project-directory` 会影响相对数据路径，必须沿用原目录或把 `PROD_HOST_DATA_ROOT` 设置为原挂载的绝对路径，避免误切换至空数据库。
+卡退款撤权上线后，不应直接回退到不识别 `refunded_card_subscriptions` 的镜像，否则重投付款事件可能恢复已退款权限。先暂停受影响卡订阅的付款事件处理、保留撤权表和数据库备份，并优先向前修复；不得删表或恢复旧库丢弃退款记录。

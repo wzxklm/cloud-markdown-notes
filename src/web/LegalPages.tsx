@@ -5,7 +5,7 @@ export const legalContact = {
   email: "cowiejulewbfwo@gmail.com"
 };
 
-const updated = "25 September 2026";
+const updated = "8 October 2026";
 
 const legalLinks = [
   { href: "/terms", label: "Terms of Service" },
@@ -47,7 +47,11 @@ export function PolicyNotice() {
       <a href="/refunds" target="_blank" rel="noreferrer">
         Refund Policy
       </a>
-      . For questions,{" "}
+      . By subscribing, you accept these terms and authorize payment for Notes. Your first card
+      subscription payment is eligible for a full, no-questions-asked refund if requested within
+      7 calendar days. This offer excludes renewals and balance subscriptions. Balance subscription
+      deductions are non-refundable; unused prepaid balance may be refunded on request. Mandatory
+      rights under applicable law and Stripe/Link rules remain unaffected. For questions,{" "}
       <a href="/contact" target="_blank" rel="noreferrer">
         contact us
       </a>
@@ -114,8 +118,17 @@ export function TermsPage() {
         cancel through the Billing page and Stripe customer portal. Cancelling a renewal keeps
         access through the end of the already paid period; after that the account returns to pending
         unless access is renewed or granted by an administrator. Cancelling does not itself refund a
-        completed payment. See the <a href="/refunds">Refund Policy</a>.
+        completed payment. By subscribing by card or enabling balance renewal, you accept these
+        terms and authorize payment for Notes. Your first card subscription payment is eligible
+        for a full, no-questions-asked refund if requested within 7 calendar days. This offer
+        excludes renewals, repeated signups and all balance subscription deductions. Balance
+        subscription deductions are non-refundable; you may request a refund of unused prepaid
+        balance. Mandatory rights under applicable law and applicable Stripe/Link rules remain
+        unaffected. See the <a href="/refunds">Refund Policy</a>.
       </p>
+      <h2>Prepaid balance</h2>
+      <p>You may top up HKD 10–1000 in whole dollars through a one-time Stripe payment. Each HKD paid adds one HKD of balance. Balance never expires and is only for your own Notes subscription; it cannot be transferred or withdrawn on demand. You may request a refund of unused prepaid balance to the original payment method under the Refund Policy. A top-up alone does not start a subscription. When you enable balance renewal, HKD 10 is deducted for each calendar month of access. You can cancel balance renewal in Billing and keep the already paid period.</p>
+      <p>Insufficient balance pauses access at expiry without charging your card. When an enabled balance subscription is funded again, it resumes from that time without charging for the paused period. To change between card and balance subscriptions, cancel renewal and wait until the previous subscription and paid access end.</p>
       <h2>Your content and public sharing</h2>
       <p>
         You keep ownership of content you upload or write. You permit us to store, process and
@@ -174,7 +187,7 @@ export function PrivacyPage() {
         When you register, we store your username, email address, password hash, account status and
         session records. We store the notes, folders, files and version history you create, and
         records of shares you publish. For subscribers, we store Stripe customer and subscription
-        identifiers, subscription status and paid-period dates. Our servers and reverse proxy may
+        identifiers, subscription status and paid-period dates. For balance payments we also store recharge orders, balance and transaction history, and Stripe payment, refund and dispute references. Our servers and reverse proxy may
         record technical request information needed for operation and security.
       </p>
       <h2>How we use it</h2>
@@ -256,29 +269,49 @@ export function RefundsPage() {
         time. Cancellation stops future recurring charges and your account remains available through
         the current paid period. Cancellation by itself is not a refund of that payment.
       </p>
-      <h2>First subscription: 7-day refund</h2>
+      <h2>Card subscriptions: 7-day no-questions-asked refund</h2>
       <p>
-        If Notes does not meet your needs, request a full refund within 7 calendar days of your
-        first subscription payment. You do not need to demonstrate a service fault. This offer
-        applies to the first subscription payment for each customer, not to each renewal or repeated
-        signup.
+        You may request a full refund within 7 calendar days of your first card subscription
+        payment, for any reason or no reason. The date you send your request determines whether
+        it falls within the 7-day window. This offer applies once per customer and does not cover
+        renewal payments or repeated signups. After that window, card subscription payments are
+        generally non-refundable. Cancel renewal before the next billing date to avoid another charge.
       </p>
-      <h2>Renewals and service problems</h2>
+      <h2>Balance subscriptions are non-refundable</h2>
       <p>
-        Renewal payments are generally non-refundable once the new billing period starts, and we do
-        not normally issue partial refunds for unused days when you cancel. Please cancel before the
-        next renewal to avoid another charge. These limits do not apply to duplicate or incorrect
-        charges, a successful payment that did not provide access, or a material service failure we
-        cannot resolve. Contact us promptly about these issues; we will review the charge and
-        provide a full or proportionate refund as appropriate to the affected service.
+        Subscription fees deducted from your Notes balance, including the first deduction and
+        renewals, are non-refundable and are not covered by the 7-day card subscription offer.
+        Cancelling balance renewal stops future deductions but does not return past deductions
+        to your balance or payment card. You retain the already paid access period.
+        Only unused balance from top-ups can be requested as a balance refund.
+      </p>
+      <h2>Unused prepaid balance refunds</h2>
+      <p>
+        You may contact support to request a refund of unused prepaid balance. The refundable
+        amount is limited to your remaining unused balance and the amount still refundable on the
+        original top-up payments. Amounts already spent on subscriptions are not refundable under
+        this balance policy. Requests are reviewed and processed manually in Stripe, with funds
+        returned to the original payment method; there is no self-service withdrawal.
+      </p>
+      <p>
+        Successful refunds are deducted from your Notes balance and recorded in balance history.
+        They do not reverse subscription deductions or remove an already paid access period.
+        Provider-required refunds or dispute adjustments can make your balance negative if funds
+        have already been spent; further balance renewals stop until the balance is sufficient.
+      </p>
+      <h2>Payment errors and mandatory rights</h2>
+      <p>
+        Contact support about duplicate or incorrect charges, paid access that was not delivered,
+        or a service failure. We will investigate and provide any correction or remedy required
+        by applicable law or the payment provider. This policy does not limit those rights.
       </p>
       <h2>How to request a refund</h2>
       <p>
         Email <a href={`mailto:${legalContact.email}`}>{legalContact.email}</a> or use the support
         link in your Stripe/Link payment receipt. Include your account email, payment date, amount,
-        receipt or transaction reference if available, and a brief reason. Never send your password
-        or full payment-card number. For the 7-day offer, the date you send the request determines
-        whether it is within the deadline.
+        receipt or transaction reference if available. No reason is required for an eligible
+        7-day card subscription refund. For a balance top-up refund, include the amount you would
+        like refunded. Never send your password or full payment-card number.
       </p>
       <h2>Review and payment timing</h2>
       <p>
@@ -291,15 +324,18 @@ export function RefundsPage() {
       </p>
       <h2>Access after a refund</h2>
       <p>
-        A full refund may end access for the refunded period. We will explain any effect on your
-        subscription when handling the request. A refund request alone does not cancel future
-        renewals: cancel through Billing or ask support for help cancelling. Export any notes you
-        need before your paid access ends.
+        Refunding unused prepaid balance keeps your already paid subscription period. If a card
+        subscription payment is refunded, any successful refund, including a
+        partial refund, ends access granted by that subscription and cancels its future renewal.
+        This applies to the subscription associated with the refunded payment, not a separate
+        replacement subscription, balance subscription or administrator-granted access. Your notes
+        are retained. A pending or failed refund does not end access; a refund request alone does
+        not cancel renewal.
       </p>
       <h2>Stripe Managed Payments</h2>
       <p>
-        Payments are processed through Stripe Managed Payments, with Stripe acting as merchant of
-        record for eligible transactions. Stripe/Link may handle payment support and refunds under
+        Card subscriptions are processed through Stripe Managed Payments, with Stripe acting as merchant of
+        record for eligible transactions. Balance top-ups use ordinary Stripe one-time payments. Stripe/Link may handle payment support and refunds for eligible Managed Payments transactions under
         its own{" "}
         <a
           href="https://support.link.com/questions/sold-through-link-refunds"

@@ -85,7 +85,7 @@ type AuthState =
   | { status: "anonymous"; token: null; user: null }
   | { status: "ready"; token: string; user: PublicUser };
 
-type ToolTab = "version" | "search" | "transfer" | "shares" | "admin";
+type ToolTab = "MCP keys" | "version" | "search" | "transfer" | "shares" | "admin";
 
 class ApiClientError extends Error {
   constructor(
@@ -704,8 +704,8 @@ function WorkspacePage({
   const tabs = useMemo<ToolTab[]>(
     () =>
       user.role === "admin"
-        ? ["version", "search", "transfer", "shares", "admin"]
-        : ["version", "search", "transfer", "shares"],
+        ? ["version", "search", "transfer", "shares", "MCP keys", "admin"]
+        : ["version", "search", "transfer", "shares", "MCP keys"],
     [user.role]
   );
 
@@ -828,6 +828,7 @@ function WorkspacePage({
                 ))}
               </div>
 
+              {tab === "MCP keys" && <McpKeys token={token} />}
               {tab === "version" && (
                 <VersionTools
                   status={status}
@@ -965,6 +966,73 @@ function TreeItem({
       ) : null}
     </div>
   );
+}
+
+type McpKey = { id: string; name: string; createdAt: string };
+
+function McpKeys({ token }: { token: string }) {
+  const [keys, setKeys] = useState<McpKey[]>([]);
+  const [name, setName] = useState("");
+  const [issued, setIssued] = useState<{ key: McpKey; secret: string } | null>(null);
+  const [busy, setBusy] = useState(true);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    apiJson<{ keys: McpKey[] }>("/api/mcp-keys", { token })
+      .then(result => { if (active) setKeys(result.keys); })
+      .catch(() => { if (active) setNotice("Could not load keys. Reopen this tab to retry."); })
+      .finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
+  }, [token]);
+
+  async function create() {
+    setBusy(true);
+    setNotice("");
+    try {
+      const result = await apiJson<{ key: McpKey; secret: string }>("/api/mcp-keys", {
+        token, method: "POST", body: { name }
+      });
+      setKeys(previous => [result.key, ...previous]);
+      setIssued(result);
+      setName("");
+    } catch {
+      setNotice("Could not create the key. Check your keys before retrying.");
+    } finally { setBusy(false); }
+  }
+
+  async function revoke(key: McpKey) {
+    if (!window.confirm("Revoke " + key.name + "? Clients using this key will lose access.")) return;
+    setBusy(true);
+    setNotice("");
+    try {
+      await apiJson("/api/mcp-keys/" + key.id, { token, method: "DELETE" });
+      setKeys(previous => previous.filter(entry => entry.id !== key.id));
+      if (issued?.key.id === key.id) setIssued(null);
+    } catch {
+      setNotice("Could not revoke the key.");
+    } finally { setBusy(false); }
+  }
+
+  return <section className="tool-stack" aria-label="Personal MCP keys">
+    <p>Use a separate key for each client. Each key grants MCP access to your workspace until revoked.</p>
+    <label>MCP server URL<input readOnly value={window.location.origin + "/mcp"} /></label>
+    <label>Key name<input value={name} maxLength={100} placeholder="Windows laptop"
+      onChange={event => setName(event.target.value)} /></label>
+    <button disabled={busy || !name.trim()} onClick={() => void create()}>Create MCP key</button>
+    {issued && <div>
+      <label>New MCP key<input readOnly value={issued.secret} onFocus={event => event.target.select()} /></label>
+      <p>Copy this key now and paste it into your MCP client’s Bearer token field. It is shown only once.</p>
+      <button onClick={() => void navigator.clipboard.writeText(issued.secret)
+        .then(() => setNotice("Key copied."))
+        .catch(() => setNotice("Select the key and copy it manually."))} disabled={!navigator.clipboard}>Copy key</button>
+    </div>}
+    {keys.map(key => <div key={key.id}>
+      <span>{key.name} · {new Date(key.createdAt).toLocaleDateString()}</span>{" "}
+      <button disabled={busy} aria-label={"Revoke " + key.name} onClick={() => void revoke(key)}>Revoke</button>
+    </div>)}
+    {notice && <p role="status">{notice}</p>}
+  </section>;
 }
 
 function VersionTools(props: {

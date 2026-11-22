@@ -17,6 +17,9 @@ const runnerRoot = path.resolve("runtime", "fulltest-docker", "runner");
 const adminUsername = process.env.ADMIN_USERNAME ?? "admin";
 
 const commands: Command[] = [
+  { name: "checkout retry regression test", args: ["tsx", "tests/api/checkout-retry-test.ts"] },
+  { name: "card refund regression test", args: ["tsx", "tests/api/card-refunds-test.ts"] },
+  { name: "wallet regression test", args: ["tsx", "tests/api/wallet-test.ts"] },
   {
     name: "billing status regression test",
     args: ["tsx", "tests/api/billing-status-test.ts"]

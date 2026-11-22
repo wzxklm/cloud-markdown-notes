@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { createHmac, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { promisify } from "node:util";
 import { apiSuccess } from "../shared/api";
 import { apiError } from "../shared/errors";
@@ -113,7 +114,7 @@ async function verifyPassword(password: string, storedHash: string): Promise<boo
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-function hashSessionToken(token: string, sessionSecret: string): string {
+export function hashSessionToken(token: string, sessionSecret: string): string {
   return createHmac("sha256", sessionSecret).update(token).digest("hex");
 }
 
@@ -317,6 +318,9 @@ export function requireCurrentUser(
   return user;
 }
 
+// Only the in-process dispatch of an MCP tool may authenticate a personal key.
+export const mcpToolCall = new AsyncLocalStorage<boolean>();
+
 export function makeAuthenticate(config: AppConfig, db: Database) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await expirePaidAccess(db);
@@ -327,13 +331,14 @@ export function makeAuthenticate(config: AppConfig, db: Database) {
     }
 
     const tokenHash = hashSessionToken(token, config.sessionSecret);
-    const result = await db.query<UserRow>(
+    const useMcpKey = mcpToolCall.getStore() && token.startsWith("notes_mcp.");
+    const result = await db.query<PublicUserRow>(
       `
-        select u.id, u.username, u.password_hash, u.role, u.status, u.created_at, u.activated_at, u.email
-        from sessions s
+        select u.id, u.username, u.role, u.status, u.created_at, u.activated_at, u.email
+        from ${useMcpKey ? "mcp_keys" : "sessions"} s
         join users u on u.id = s.user_id
         where s.token_hash = $1
-          and s.expires_at > now() and s.scope = 'workspace'
+          ${useMcpKey ? "" : "and s.expires_at > now() and s.scope = 'workspace'"}
       `,
       [tokenHash]
     );

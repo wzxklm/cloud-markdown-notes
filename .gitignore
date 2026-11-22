@@ -11,3 +11,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.tgz
+
+# Local operational backups may contain credentials
+/backups/
+
+
+.env.dev.local

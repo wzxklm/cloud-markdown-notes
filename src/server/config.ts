@@ -16,6 +16,9 @@ export type AppConfig = {
   stripeSecretKey?: string;
   stripePriceId?: string;
   stripeWebhookSecret?: string;
+  stripeTopupProductId?: string;
+  stripeTopupPrices?: Record<number, string>;
+  stripeLiveMode?: boolean;
 };
 
 function readNumber(name: string, fallback: number): number {
@@ -65,6 +68,17 @@ export function loadConfig(): AppConfig {
     adminPassword,
     stripeSecretKey: process.env.STRIPE_SECRET_KEY,
     stripePriceId: process.env.STRIPE_PRICE_ID,
-    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    stripeTopupProductId: process.env.STRIPE_TOPUP_PRODUCT_ID,
+    stripeTopupPrices: Object.fromEntries(
+      [10, 30, 100].flatMap((amount) =>
+        process.env["STRIPE_TOPUP_PRICE_" + amount]
+          ? [[amount * 100, process.env["STRIPE_TOPUP_PRICE_" + amount]!]]
+          : []
+      )
+    ),
+    stripeLiveMode: process.env.STRIPE_LIVEMODE
+      ? process.env.STRIPE_LIVEMODE === "true"
+      : Boolean(process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_"))
   };
 }

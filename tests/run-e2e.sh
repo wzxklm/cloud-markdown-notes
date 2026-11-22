@@ -37,7 +37,7 @@ cleanup() {
 trap 'status=130; cleanup; exit "$status"' INT
 trap 'status=143; cleanup; exit "$status"' TERM
 
-compose up -d --build app db || status=$?
+compose up -d --build --wait app db || status=$?
 if [ "$status" -eq 0 ]; then
   run_full_test || status=$?
 fi

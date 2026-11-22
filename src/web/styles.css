@@ -120,6 +120,18 @@ label {
   padding: 4px;
 }
 
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.tabs button {
+  flex: 1 0 auto;
+  padding-inline: 4px;
+  white-space: nowrap;
+}
+
 .segmented button,
 .tabs button {
   border-color: transparent;
@@ -744,3 +756,12 @@ label {
 .policy-notice a { color: #245943; text-decoration: underline; }
 .legal-document, .legal-footer { overflow-wrap: anywhere; }
 @media (max-width: 420px) { .legal-site .site-header nav { gap: 10px; } }
+
+.wallet-section { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #ddd; }
+.wallet-section h2 { display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.wallet-history { overflow-x:auto; }
+.wallet-history table { width:100%; font-size:.85rem; border-collapse:collapse; }
+.wallet-history th,.wallet-history td { text-align:left; padding:.65rem .4rem; border-bottom:1px solid #ddd; white-space:nowrap; }
+
+.wallet-section { display: flex; flex-direction: column; gap: .8rem; }
+.wallet-section h2, .wallet-section h3, .wallet-section p { margin: 0; }

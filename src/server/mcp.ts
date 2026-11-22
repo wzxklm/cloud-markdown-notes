@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { mcpToolCall } from "./auth";
 import type { AppConfig } from "./config";
 import type { Database } from "./db";
 
@@ -58,7 +59,7 @@ export function registerMcpRoutes(app: FastifyInstance, _config: AppConfig, _db:
         payload = Buffer.from(args.contentBase64, "base64");
         headers["content-type"] = "application/zip";
       }
-      const response = await app.inject({ method: tool.method, url: path, headers, payload } as any);
+      const response = await mcpToolCall.run(true, () => app.inject({ method: tool.method, url: path, headers, payload } as any));
       let data: unknown; try { data = JSON.parse(response.body); } catch { data = response.body; }
       return result({ content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }], isError: response.statusCode >= 400 });
     }

@@ -1,167 +1,61 @@
 ---
 name: cloud-notes-cli
-description: "Use when Codex needs to operate Cloud Markdown Notes through the `notes` CLI: install or update the CLI, configure API URL/auth, inspect or edit notes, commit/restore versions, import/export/share, parse JSON output, or recover from CLI/API errors."
+description: Operate Cloud Markdown Notes through the notes CLI to inspect or edit notes, manage versions, import/export, or share content. Use for this CLI, not generic Markdown editing or VPS administration.
 ---
 
 # Cloud Notes CLI
 
-This skill gives Codex the minimum operating procedure for using the Cloud Markdown Notes `notes` CLI without loading a full command manual. For exact syntax, run `notes help`.
+Use the existing `notes` client and run `notes help` for exact syntax. Install or upgrade only when needed for the user's task; do not automatically update to latest. Respect local development-container requirements when installing tools on a managed VPS.
 
-## Install Or Update
-
-Install or update the published CLI:
+## Target and authentication
 
 ```bash
-npm install -g cloud-markdown-notes@latest
-```
-
-Use the public command:
-
-```bash
-notes <command>
-```
-
-Do not edit CLI config files directly. Configure the CLI through `notes config`, `notes auth`, global flags, or environment variables.
-
-## Configure And Authenticate
-
-Set the target server and check it before doing work:
-
-```bash
-notes config set-api-url <server-url>
-notes config get
-notes health --json
-```
-
-For one-off commands, pass the URL or token explicitly:
-
-```bash
-notes --api-url <server-url> health --json
-notes --token <token> auth me --json
-```
-
-Prefer login for normal sessions:
-
-```bash
-notes auth login <username> <password>
+notes config get --json
+notes --api-url '<server-url>' health --json
 notes auth me --json
 ```
 
-If a user is pending, log in as an admin, inspect pending users, and activate the intended user:
+Respect the user's selected server. URL precedence is `--api-url` → `NOTES_API_URL` → config → localhost:8080; token precedence is `--token` → `NOTES_TOKEN` → config. Do not assume the default localhost port is the intended service.
+Use CLI configuration commands, flags or environment variables rather than editing config files directly. Keep separate config paths with `NOTES_CONFIG_PATH` when switching accounts or environments.
 
-```bash
-notes admin pending-users --json
-notes admin activate <user-id>
-```
+Prefer an existing authorized session. When login is needed, `notes auth login '<username>' '<password>'` stores the session. Do not expose passwords in tool transcripts. Avoid `--json` on login because its response contains the session token; also treat registration JSON as potentially credential-bearing. Do not print config-file contents or tokens. `config get` reports tokenConfigured without revealing the token.
 
-## Output Rules
+A pending account is not permission to activate it or switch to administrator credentials. Activate a specified account only when that operation is within the user's authorized task.
 
-Use `--json` whenever Codex will parse, assert, or reuse command output:
+## Read and modify
+
+For a narrow task, inspect only the relevant state; do not force a full workflow. Before changing a note, read it and locate the exact lines. Use `--json` when parsing non-secret output; success is wrapped in data and failures in error with code/message.
 
 ```bash
 notes tree --json
-notes status --json
-notes history --json
-```
-
-Successful JSON responses are wrapped in `data`; failures are wrapped in `error` with `code` and `message`.
-
-Human-readable output is acceptable for inspection-heavy commands such as `notes help`, `notes diff`, and `notes show <sha>`.
-
-Quote paths, globs, and regexes that may contain shell metacharacters. Workspace paths start with `/`; notes are Markdown files ending in `.md`. Note content is read from stdin; use input redirection, a pipe, or a quoted heredoc so the shell does not interpret Markdown.
-
-## Agent Workflow
-
-Use this sequence unless the user asks for a narrower operation:
-
-1. Confirm the target server: `notes config get` or `notes --api-url <url> ...`.
-2. Check health: `notes health --json`.
-3. Authenticate and verify identity: `notes auth login ...`, then `notes auth me --json`.
-4. Inspect state before mutating: `notes tree --json`, `notes status --json`, and, for version tasks, `notes history --json`.
-5. Read before editing: use `notes note read <path> --json` for full files or `notes search read <path> --offset <n> --limit <n> --json` for a slice.
-6. Make the smallest command that satisfies the task.
-7. Re-check state with `notes status --json`, relevant reads/searches, or `notes diff`.
-8. Commit only when requested or clearly part of the workflow: `notes commit -m "<message>" --json`.
-
-## Common Task Patterns
-
-Create or inspect content:
-
-```bash
-notes folder mkdir /docs
-notes note create /docs/a.md --json <<'MARKDOWN'
-# A
-MARKDOWN
+notes search grep "target" --json
+notes search read /docs/a.md --offset 1 --limit 40 --json
 notes note read /docs/a.md --json
-notes tree --json
-```
-
-Edit content:
-
-```bash
-notes note replace /docs/a.md --json < updated.md
 notes note edit /docs/a.md --from-line 10 --to-line 12 --json <<'MARKDOWN'
 Replacement
 MARKDOWN
-notes note edit /docs/a.md --from-line 10 --to-line 12 --json < /dev/null
-notes note mv /docs/a.md /docs/b.md --json
-notes note rm /docs/b.md --json
+notes note replace /docs/a.md --json < updated.md
 ```
 
-Find content and read context:
+Workspace paths begin with `/`; notes end with `.md`. Quote paths/globs/regexes containing shell metacharacters. Create/replace/edit take content only from stdin; use a quoted heredoc or file input. Empty stdin deletes the selected range for edit. Line ranges are 1-based and inclusive.
 
-```bash
-notes search glob "**/*.md" --json
-notes search grep "target text" --ignore-case --json
-notes search read /docs/a.md --offset 1 --limit 40 --json
-```
+The CLI normally fetches the current fileVersion; `--if-match` explicitly supplies it. For EDIT_CONFLICT, re-read and reconcile the change before retrying. Verify the resulting read or diff; do not overwrite another change blindly.
 
-Manage versions:
+## Versions, imports and sharing
 
 ```bash
 notes status --json
 notes diff
-notes commit -m "save notes" --json
 notes history --json
-notes show <sha>
-notes restore --commit <sha> --path /docs/a.md --type file --json
-notes discard --json
-```
-
-Import, export, and share:
-
-```bash
-notes export -o notes.zip
+notes show '<sha>'
 notes import notes.zip --dry-run --json
-notes import notes.zip --json
-notes share publish /docs/a.md --json
 notes share list --json
-notes share unpublish <share-id> --json
 ```
 
-## Guardrails
+- Commit only when requested or clearly included in the task. Do not add a commit to every text edit.
+- Before rm, discard, restore or a writing import, verify the account, path and affected state. Use the existing user authorization; ask only when scope is unclear.
+- Inspect import dry-run conflicts before the actual import. Do not delete conflicting data merely to make import succeed.
+- Public sharing requires a committed note and clean workspace; publish only when requested. Do not commit unrelated drafts to satisfy the precondition.
+- Exported ZIP files contain notes/folders, not a complete account/database/Git backup.
 
-Run `notes help` when command syntax is uncertain instead of guessing.
-
-Before destructive or broad operations, verify the active user, target path, and current status. This applies especially to `note rm`, `folder rm`, `discard`, `restore`, and non-dry-run `import`.
-
-For focused edits, prefer `search grep` plus `search read` to find exact line ranges, then use `note edit`.
-
-For imports, run `notes import <zip> --dry-run --json` first and inspect conflicts before applying.
-
-For shares, commit the note and ensure the workspace is clean before publishing.
-
-## Error Recovery
-
-Use `error.code` to choose the next step:
-
-- `UNAUTHENTICATED`: log in again or pass `--token` for a one-off command.
-- `USER_PENDING`: activate the user as admin.
-- `FORBIDDEN`: switch to an account with permission.
-- `VALIDATION_ERROR`: re-check command syntax with `notes help` and validate paths.
-- `PATH_NOT_FOUND`: inspect `notes tree --json` and create or correct the parent path.
-- `PATH_ALREADY_EXISTS`: choose another path or remove/move the existing item intentionally.
-- `EDIT_CONFLICT`: re-read the note, then retry with the current version or omit `--if-match`.
-- `NO_CHANGES_TO_COMMIT`: inspect `notes status --json`; do not retry commit unchanged.
-- `IMPORT_CONFLICT`: rerun dry-run and inspect conflict paths.
-- `NOTE_NOT_COMMITTED`: commit the note before publishing a share.
+For UNAUTHENTICATED, use an authorized login; for USER_PENDING or FORBIDDEN, explain the access requirement without escalating privileges automatically. For PATH_NOT_FOUND/PATH_ALREADY_EXISTS, inspect and correct the intended path. For NO_CHANGES_TO_COMMIT, stop retrying unchanged state. Use `notes help` for unknown flags instead of guessing.
