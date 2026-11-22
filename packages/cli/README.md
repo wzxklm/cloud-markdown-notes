@@ -16,7 +16,7 @@ notes auth me --json
 
 Replace placeholders in a private terminal. Login takes a password argument; do not put real credentials in shared command transcripts. Human-readable login saves the session without printing its token; **login with `--json` includes the token** and must not be logged.
 
-Config defaults to `~/.config/cloud-markdown-notes/config.json`; override with `NOTES_CONFIG_PATH`. URL precedence: `--api-url` → `NOTES_API_URL` → config → `http://localhost:8080`. Token precedence: `--token` → `NOTES_TOKEN` → config. This VPS runs Notes on localhost **18081**, so the default 8080 is not its Notes API. Prefer the HTTPS domain.
+Config defaults to `~/.config/cloud-markdown-notes/config.json`; override with `NOTES_CONFIG_PATH`. URL precedence: `--api-url` → `NOTES_API_URL` → config → `http://localhost:8080`. Token precedence: `--token` → `NOTES_TOKEN` → config. Set the HTTPS URL of your own Notes instance or use the hosted service shown above.
 
 ## Read and edit
 
