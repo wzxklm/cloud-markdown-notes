@@ -49,6 +49,6 @@ notes export -o notes.zip
 notes share list --json
 ```
 
-Commit, restore, discard, deletion, import and public sharing change user data or visibility: use them only for the requested operation. Import dry-run does not write data; publishing requires a committed note and a clean workspace. ZIP export does not back up database metadata or Git history.
+Commit, restore, discard, deletion, import and public sharing change user data or visibility: use them only for the requested operation. Import dry-run does not write data; publishing requires the target note to match its committed version. Other paths can have pending changes. ZIP export does not back up database metadata or Git history.
 
 `notes help` contains the full command syntax. JSON success is wrapped in data and failure in error; version status/diff preserve non-ASCII filenames. See [server README](../../README.md) for deployment and [the skill](../../docs/skills/cloud-notes-cli/SKILL.md) for agent constraints.

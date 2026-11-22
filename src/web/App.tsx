@@ -715,6 +715,7 @@ function WorkspacePage({
         <aside className="sidebar">
           <div className="brand-row">
             <h1><a href="/">Notes</a></h1>
+            <a href="/#guides">Guides</a>
             <a href="/billing">Billing</a>
             <button className="ghost" onClick={() => void apiJson("/api/auth/logout", { method: "POST", token }).finally(onLogout)}>
               Logout

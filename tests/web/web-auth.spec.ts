@@ -49,3 +49,23 @@ test("registers a pending user, activates it as admin, and logs in", async ({ pa
   await expect(page.getByText(`${username} · user`)).toBeVisible();
   await expect(page.getByText("No note selected")).toBeVisible();
 });
+
+test("homepage separates workspace access from registration", async ({ page }) => {
+  await page.goto("/");
+  const hero = page.locator(".hero-actions");
+  await hero.getByRole("link", { name: /Start your notebook/ }).click();
+  await expect(page).toHaveURL(/\/register$/);
+  await page.goto("/");
+  await hero.getByRole("link", { name: /Open workspace/ }).click();
+  await expect(page.getByLabel("Password")).toBeVisible();
+  await page.evaluate(() => localStorage.setItem("cloud-markdown-notes-token", "fixture"));
+  await page.goto("/");
+  await expect(page.locator('a[href="/register"]')).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Manage subscription/ })).toHaveAttribute("href", "/billing");
+  await page.route("**/api/auth/me", route => route.fulfill({
+    json: { data: { user: { username: "returning", role: "user", status: "active" } } }
+  }));
+  await hero.getByRole("link", { name: /Open workspace/ }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByText("returning · user")).toBeVisible();
+});

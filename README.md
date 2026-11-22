@@ -26,7 +26,7 @@ curl -fsS http://127.0.0.1:18081/api/health
 | 凭据、外部地址、Stripe 配置 | `.env.prod` |
 | 镜像和数据库备份 | `backups/` |
 
-应用镜像为 `local/notes:mcp-tabs-20261122`，数据库镜像由生产 Compose 固定，两者均为 `pull_policy: never`。恢复时，应用镜像从 `backups/mcp-tabs-20261122T063410Z/release-image.tar.gz` 导入，数据库镜像从 `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` 导入，命令为 `gzip -dc <归档路径> | docker image load`。升级前执行一致性备份，再显式修改 Compose 的 `image`。
+应用镜像为 `local/notes:home-guides-20261122`，数据库镜像由生产 Compose 固定，两者均为 `pull_policy: never`。恢复时，应用镜像从 `backups/home-guides-20261122T082619Z/release-image.tar.gz` 导入，数据库镜像从 `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` 导入，命令为 `gzip -dc <归档路径> | docker image load`。升级前执行一致性备份，再显式修改 Compose 的 `image`。
 生产启动会执行数据库迁移，再启动 API/Web。Web 将 `/api/*` 和 `/mcp` 代理到 API，其他页面使用 SPA fallback。
 
 生产凭据只存 `.env.prod`；不要从 example 覆盖。`PROD_HOST_API_PORT=18081`、`PROD_HOST_WEB_PORT=5173`，`PUBLIC_BASE_URL=https://notes.bosschat.de`。Nginx 清单见 `/root/nginx/sites.json`，生成站点为 `/root/nginx/config/conf.d/notes.conf`。
@@ -83,7 +83,7 @@ JSON API 成功返回 `{ "data": ... }`，失败返回 `{ "error": { "code": ...
 | 分享 | `/api/shares`、`/api/shares/public/:slug`；页面 `/s/:slug` |
 
 完整方法和断言见 [功能清单](docs/可测试功能.md)。替换/局部编辑前读取 `fileVersion` 并作为 `ifMatch` 提交；局部编辑行号从 1 开始、两端包含，空内容删除指定行。`EDIT_CONFLICT` 时重读后重试，不覆盖新版本。
-分享仅发布已提交且工作区干净的笔记，内容固定到该 commit；ZIP 导出不包含完整数据库或 Git 历史，不能替代备份。
+分享要求目标笔记已提交且自身无待提交修改，其他路径可以保留草稿，内容固定到该 commit；ZIP 导出不包含完整数据库或 Git 历史，不能替代备份。
 
 CLI 只要求客户端 Node.js 18+，不要求安装服务端。安装和命令示例见 [CLI README](packages/cli/README.md)。在开发容器可直接运行 `notes help`；访问生产必须显式使用 `https://notes.bosschat.de`，不要把 CLI 默认 localhost:8080 当作本机生产 Notes。
 
@@ -189,3 +189,5 @@ curl -fsS http://127.0.0.1:18081/api/health
 产生余额业务数据后，旧镜像不识别余额权限，不能直接回滚后继续收款。回退前暂停充值入口，停止新写入并备份新增账本；保留新增表及流水，禁止通过删除表或恢复旧库丢弃付款记录。确认没有新增付款时，可将备份的 `compose.prod.before.yml` 和 `env.prod.before` 恢复到原路径，再执行上述生产启动命令；已有付款时优先修复或按账本核对后处理。
 
 卡退款撤权上线后，不应直接回退到不识别 `refunded_card_subscriptions` 的镜像，否则重投付款事件可能恢复已退款权限。先暂停受影响卡订阅的付款事件处理、保留撤权表和数据库备份，并优先向前修复；不得删表或恢复旧库丢弃退款记录。
+
+官网首页提供 [CLI skill](https://notes.bosschat.de/#cli-guide) 和 [MCP 安装指南](https://notes.bosschat.de/#mcp-guide)。页面随镜像构建读取仓库中的指南，原始 skill 下载与仓库文件共用同一来源。

@@ -1,7 +1,7 @@
 name: notes-prod
 services:
   app:
-    image: local/notes:mcp-tabs-20261122
+    image: local/notes:home-guides-20261122
     environment:
       APP_ENV: production
       API_PORT: 3000

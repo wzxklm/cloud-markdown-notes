@@ -1,0 +1,1 @@
+../../docs/skills/cloud-notes-cli/SKILL.md

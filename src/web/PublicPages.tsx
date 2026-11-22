@@ -1,9 +1,23 @@
 import { useEffect, useState } from "react";
 import { apiJson, toMessage, type PublicUser } from "./App";
 import { LegalFooter, PolicyNotice } from "./LegalPages";
+import { HomeGuides } from "./HomeGuides";
+
 const tokenKey = "cloud-markdown-notes-token";
 
 export function LandingPage() {
+  const readSession = () => Boolean(localStorage.getItem(tokenKey));
+  const [hasSession, setHasSession] = useState(readSession);
+  useEffect(() => {
+    const sync = () => setHasSession(readSession());
+    window.addEventListener("storage", sync);
+    window.addEventListener("pageshow", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("pageshow", sync);
+    };
+  }, []);
+
   return (
     <main className="landing">
       <header className="site-header">
@@ -13,10 +27,13 @@ export function LandingPage() {
         <nav>
           <a href="#features">Features</a>
           <a href="#pricing">Pricing</a>
+          <a href="#guides">Guides</a>
+          {hasSession ? <a className="button-link primary" href="/app">Open workspace</a> : <>
           <a href="/login">Log in</a>
           <a className="button-link primary" href="/register">
             Register
           </a>
+          </>}
         </nav>
       </header>
       <section className="hero">
@@ -31,10 +48,8 @@ export function LandingPage() {
           and share what matters.
         </p>
         <div className="hero-actions">
-          <a className="button-link primary" href="/register">
-            Start your notebook ↗
-          </a>
-          <a href="/app">Open workspace →</a>
+          <a className="button-link primary" href="/app">Open workspace →</a>
+          {!hasSession && <a className="button-link" href="/register">Start your notebook ↗</a>}
         </div>
         <p className="subtle">Web · CLI · MCP — one workspace, wherever you work.</p>
         <div className="note-sample" aria-label="Example Markdown note">
@@ -115,14 +130,15 @@ export function LandingPage() {
             <li>Web, CLI and MCP access</li>
             <li>ZIP import and export</li>
           </ul>
-          <a className="button-link primary" href="/register">
-            Create account & subscribe →
+          <a className="button-link primary" href={hasSession ? "/billing" : "/register"}>
+            {hasSession ? "Manage subscription →" : "Create account & subscribe →"}
           </a>
-          <p className="subtle">
+          {!hasSession && <p className="subtle">
             Register first, then subscribe by card or top up and enable a balance subscription.
-          </p>
+          </p>}
         </article>
       </section>
+      <HomeGuides />
       <section className="faq">
         <h2>A few useful details.</h2>
         <details>
