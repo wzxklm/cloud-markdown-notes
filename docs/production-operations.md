@@ -24,7 +24,7 @@ In the same Bash shell, use `"${dc[@]}" logs --tail 100` to inspect logs, `"${dc
 | Credentials, public URL, and Stripe settings | `.env.prod` |
 | Image and database backups | `backups/` |
 
-The application image is `local/notes:cli-install-20261122`. Production Compose also pins the database image and sets `pull_policy: never` for both services. To restore the images, load the application archive at `backups/cli-install-20261122T164201Z/release-image.tar.gz` and the database image from `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` using `gzip -dc <archive> | docker image load`. Take a consistent backup before updating the Compose image reference.
+The application image is `local/notes:cli-url-20261122`. Production Compose also pins the database image and sets `pull_policy: never` for both services. To restore the images, load the application archive at `backups/cli-url-20261122T165755Z/release-image.tar.gz` and the database image from `backups/mcp-keys-20261122T062724Z/rollback-images.tar.gz` using `gzip -dc <archive> | docker image load`. Take a consistent backup before updating the Compose image reference.
 
 Startup runs database migrations before the API and web services. The web service proxies `/api/*` and `/mcp` to the API and serves the SPA entry point for client-side routes.
 

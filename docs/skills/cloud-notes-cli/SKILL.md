@@ -11,13 +11,12 @@ If `notes` is missing, install Node.js 18+ with npm, run `npm install -g cloud-m
 
 ## Target and authentication
 
+On first use, set the server URL. For the official Notes service, run:
+
 ```bash
-notes config get --json
-notes --api-url '<server-url>' health --json
-notes auth me --json
+notes config set-api-url https://notes.bosschat.de
 ```
 
-Respect the user's selected server. URL precedence is `--api-url` → `NOTES_API_URL` → config → localhost:8080; token precedence is `--token` → `NOTES_TOKEN` → config. Do not assume the default localhost port is the intended service.
 Use CLI configuration commands, flags or environment variables rather than editing config files directly. Keep separate config paths with `NOTES_CONFIG_PATH` when switching accounts or environments.
 
 Prefer an existing authorized session. When login is needed, `notes auth login '<username>' '<password>'` stores the session. Do not expose passwords in tool transcripts. Avoid `--json` on login because its response contains the session token; also treat registration JSON as potentially credential-bearing. Do not print config-file contents or tokens. `config get` reports tokenConfigured without revealing the token.
